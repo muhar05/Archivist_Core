@@ -31,7 +31,7 @@ export default function LoginPage() {
 
       if (data.user) {
         toast.success("Berhasil Masuk", { description: "Mengarahkan ke dashboard..." })
-        router.push("/")
+        router.push("/dashboard")
         router.refresh()
       }
     } catch (err) {
