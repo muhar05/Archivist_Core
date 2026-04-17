@@ -12,9 +12,12 @@ export const updateSession = async (request: NextRequest) => {
     },
   });
 
+  const isInvalid = (val: string | undefined) => 
+    !val || val === "undefined" || val === "null" || val.trim() === "";
+
   const supabase = createServerClient(
-    supabaseUrl || "https://placeholder.supabase.co",
-    supabaseKey || "placeholder-key",
+    isInvalid(supabaseUrl) ? "https://placeholder.supabase.co" : supabaseUrl!,
+    isInvalid(supabaseKey) ? "placeholder-key" : supabaseKey!,
     {
       cookies: {
         getAll() {
@@ -33,8 +36,8 @@ export const updateSession = async (request: NextRequest) => {
     },
   );
 
-  // If we are in build/prerender phase without env vars, skip the auth checks
-  if (!supabaseUrl || !supabaseKey) {
+  // If we are in build/prerender phase without valid env vars, skip the auth checks
+  if (isInvalid(supabaseUrl) || isInvalid(supabaseKey)) {
     return supabaseResponse;
   }
 
