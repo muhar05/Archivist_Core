@@ -13,8 +13,8 @@ export const updateSession = async (request: NextRequest) => {
   });
 
   const supabase = createServerClient(
-    supabaseUrl!,
-    supabaseKey!,
+    supabaseUrl || "https://placeholder.supabase.co",
+    supabaseKey || "placeholder-key",
     {
       cookies: {
         getAll() {
@@ -32,6 +32,11 @@ export const updateSession = async (request: NextRequest) => {
       },
     },
   );
+
+  // If we are in build/prerender phase without env vars, skip the auth checks
+  if (!supabaseUrl || !supabaseKey) {
+    return supabaseResponse;
+  }
 
   const {
     data: { user },
