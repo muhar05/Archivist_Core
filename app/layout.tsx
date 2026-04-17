@@ -24,8 +24,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Archivist Core",
-  description: "Archivist Core",
+  title: "Archivist Core | Modernize Your Physical Archives",
+  description: "Bridge the gap between physical storage and digital efficiency. A customizable warehouse management system designed to track, locate, and manage hardcopy reports with precision.",
 };
 
 export default function RootLayout({
