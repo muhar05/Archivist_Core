@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -25,29 +25,18 @@ import { LANDING_ASSETS } from "@/constants/assets"
 import { buttonSpring } from "@/constants/animations"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState<string>("")
+  const supabase = createClient()
+  const [email, setEmail] = useState<string>("admin@test.com")
   const [password, setPassword] = useState<string>("")
   const [showPassword, setShowPassword] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
   const router = useRouter()
-
-  useEffect(() => {
-    const supabase = createClient()
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        router.push("/dashboard")
-      }
-    }
-    checkUser()
-  }, [router])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     
     try {
-      const supabase = createClient()
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -102,7 +91,7 @@ export default function LoginPage() {
       </nav>
 
       {/* Main Content: Login Shell */}
-      <main className="min-h-screen flex items-center justify-center pt-16 pb-20 relative overflow-hidden">
+      <main className="min-h-screen flex items-center justify-center pt-26 pb-20 relative overflow-hidden">
         {/* Ambient Background Pattern */}
         <div className="absolute inset-0 z-0">
           <Image 

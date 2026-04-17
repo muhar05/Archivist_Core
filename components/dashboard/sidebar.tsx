@@ -6,17 +6,17 @@ import { usePathname } from "next/navigation"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: "dashboard", fillIcon: true },
-  { name: "Records", href: "/dashboard/records", icon: "inventory_2" },
-  { name: "Locations", href: "/dashboard/locations", icon: "location_on" },
-  { name: "Loans", href: "/dashboard/loans", icon: "assignment_return" },
-  { name: "Analytics", href: "/dashboard/analytics", icon: "analytics" },
+  { name: "Records", href: "/records", icon: "inventory_2" },
+  { name: "Locations", href: "/locations", icon: "location_on" },
+  { name: "Loans", href: "/loans", icon: "assignment_return" },
+  { name: "Analytics", href: "/analytics", icon: "analytics" },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex flex-col fixed left-0 top-0 pt-16 z-40 bg-slate-50 dark:bg-slate-950 h-screen w-64 font-heading font-medium text-sm border-r border-outline-variant/10">
+    <aside className="flex flex-col fixed left-0 top-0 pt-4 z-40 bg-slate-50 dark:bg-slate-950 h-screen w-64 font-heading font-medium text-sm border-r border-outline-variant/10">
       <div className="px-6 py-8 flex flex-col gap-2 h-full">
         <div className="flex items-center gap-3 px-2 mb-6">
           <div className="w-10 h-10 primary-gradient rounded-lg flex items-center justify-center text-white shadow-lg">

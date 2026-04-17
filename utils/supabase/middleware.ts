@@ -12,12 +12,9 @@ export const updateSession = async (request: NextRequest) => {
     },
   });
 
-  const isInvalid = (val: string | undefined) => 
-    !val || val === "undefined" || val === "null" || val.trim() === "";
-
   const supabase = createServerClient(
-    isInvalid(supabaseUrl) ? "https://placeholder.supabase.co" : supabaseUrl!,
-    isInvalid(supabaseKey) ? "placeholder-key" : supabaseKey!,
+    supabaseUrl!,
+    supabaseKey!,
     {
       cookies: {
         getAll() {
@@ -36,11 +33,6 @@ export const updateSession = async (request: NextRequest) => {
     },
   );
 
-  // If we are in build/prerender phase without valid env vars, skip the auth checks
-  if (isInvalid(supabaseUrl) || isInvalid(supabaseKey)) {
-    return supabaseResponse;
-  }
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -48,6 +40,7 @@ export const updateSession = async (request: NextRequest) => {
   // Protected routes logic
   if (
     !user &&
+    request.nextUrl.pathname !== '/' &&
     !request.nextUrl.pathname.startsWith('/auth/login') &&
     !request.nextUrl.pathname.startsWith('/auth/auth-code-error')
   ) {
