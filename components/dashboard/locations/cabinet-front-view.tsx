@@ -6,13 +6,15 @@ import { StorageUnit } from "./types"
 import { Archive, Lock, Info } from "lucide-react"
 
 interface CabinetFrontViewProps {
-  cabinet: StorageUnit;
+  stack: StorageUnit[];
   onLockerClick: (locker: StorageUnit) => void;
   onBack: () => void;
 }
 
-export function CabinetFrontView({ cabinet, onLockerClick, onBack }: CabinetFrontViewProps) {
-  const lockers = cabinet.children || [];
+export function CabinetFrontView({ stack, onLockerClick, onBack }: CabinetFrontViewProps) {
+  // Sort stack from top to bottom (highest stackOrder first)
+  const sortedStack = [...stack].sort((a, b) => (b.stackOrder || 0) - (a.stackOrder || 0));
+  const mainCabinet = sortedStack[0];
 
   const handleDragEnd = (idx: number, info: PanInfo) => {
     // In a real app, calculate new index based on drop position
@@ -25,98 +27,92 @@ export function CabinetFrontView({ cabinet, onLockerClick, onBack }: CabinetFron
 
   return (
     <motion.div 
-      layoutId={`cabinet-${cabinet.id}`}
+      layoutId={`cabinet-stack-${mainCabinet.x}-${mainCabinet.y}`}
       className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 flex flex-col p-8 rounded-4xl border-12 border-slate-800 shadow-2xl overflow-hidden"
     >
-      {/* Cabinet Frame Overlay */}
-      <div className="absolute inset-x-0 top-0 h-4 bg-slate-700/50 blur-sm pointer-events-none" />
-
       {/* Header */}
       <div className="flex justify-between items-center mb-10 px-4">
         <div>
           <button 
             onClick={onBack}
-            className="text-[10px] font-black text-primary uppercase tracking-[0.2em] hover:underline mb-2 flex items-center gap-1"
+            className="text-[10px] font-black text-primary uppercase tracking-[0.2em] hover:underline mb-3 flex items-center gap-1"
           >
-            ← BACK TO ROOM FLOORPLAN
+            ← BACK TO ROOM
           </button>
-          <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
-            {cabinet.name}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Archive</span>
+            <span className="text-slate-300">/</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Floor {mainCabinet.x},{mainCabinet.y}</span>
+          </div>
+          <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white mb-2">
+            Vertical Storage Stack
           </h2>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-            INTERNAL SLOTS DESIGNER • {lockers.length} UNITS
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-           <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-outline-variant/10">
-              <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                   <Archive className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Status</p>
-                   <p className="text-sm font-black text-slate-900 dark:text-white">Operational</p>
-                 </div>
-              </div>
-           </div>
+          <div className="flex items-center gap-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              {stack.length} Units Stacked
+            </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Operational
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Internal Locker Grid with DND */}
-      <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto p-4 scrollbar-thin">
-        {lockers.map((locker, idx) => {
-          const isFull = (locker.currentLoad || 0) >= (locker.capacity || 1);
-          
+      {/* Vertical Stack List */}
+      <div className="flex-1 space-y-12 overflow-y-auto px-4 pb-12 scrollbar-thin">
+        {sortedStack.map((cabinet, sIdx) => {
+          const lockers = cabinet.children || [];
           return (
-            <motion.div
-              key={locker.id}
-              layout
-              drag
-              dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
-              dragElastic={0.4}
-              onDragEnd={(_, info) => handleDragEnd(idx, info)}
-              whileHover={{ scale: 1.02, zIndex: 10 }}
-              whileDrag={{ scale: 1.05, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}
-              onClick={() => onLockerClick(locker)}
-              className="relative bg-white dark:bg-slate-900 p-8 rounded-3xl border-2 border-outline-variant/10 hover:border-primary transition-colors cursor-grab active:cursor-grabbing shadow-sm"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className={`p-3 rounded-xl ${isFull ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-600'}`}>
-                  {isFull ? <Lock className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                </div>
-                <div className="flex gap-1">
-                  <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400">
-                    <Info className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+            <div key={cabinet.id} className="space-y-6">
+              <div className="flex items-center gap-3">
+                 <div className="px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg">
+                   LEVEL {stack.length - sIdx}
+                 </div>
+                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                   {cabinet.name}
+                 </h3>
+                 <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
               </div>
 
-              <h3 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-primary transition-colors">
-                {locker.name}
-              </h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Slot {locker.code || (idx + 1).toString().padStart(2, '0')}
-              </p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                {lockers.map((locker, idx) => {
+                  const isFull = (locker.currentLoad || 0) >= (locker.capacity || 1);
+                  return (
+                    <motion.div
+                      key={locker.id}
+                      layout
+                      whileHover={{ scale: 1.02, zIndex: 10 }}
+                      onClick={() => onLockerClick(locker)}
+                      className="relative bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-outline-variant/10 hover:border-primary transition-colors cursor-pointer shadow-sm"
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={`p-2 rounded-xl ${isFull ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-600'}`}>
+                          {isFull ? <Lock className="w-3 h-3" /> : <Archive className="w-3 h-3" />}
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400">{locker.code}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">
+                        {locker.name}
+                      </h4>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[8px] font-black uppercase tracking-widest ${isFull ? 'text-slate-400' : 'text-emerald-500'}`}>
+                          {isFull ? 'FULL' : 'AVAILABLE'}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )
+                })}
 
-              {/* Status Indicator Bar */}
-              <div className="mt-6 flex items-center justify-between">
-                <div className={`w-2 h-2 rounded-full ${isFull ? 'bg-slate-400' : 'bg-emerald-500'}`} />
-                <span className={`text-[10px] font-black uppercase tracking-widest ${isFull ? 'text-slate-400' : 'text-emerald-500'}`}>
-                  {isFull ? 'FULL' : 'AVAILABLE'}
-                </span>
+                <button className="border-2 border-dashed border-outline-variant/20 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-primary transition-all min-h-[120px]">
+                  <span className="material-symbols-outlined text-sm">add</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest">New Slot</span>
+                </button>
               </div>
-            </motion.div>
+            </div>
           )
         })}
-
-        {/* Add Slot Button */}
-        <button className="border-2 border-dashed border-outline-variant/20 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-primary hover:border-primary/40 transition-all min-h-[160px]">
-          <div className="w-10 h-10 rounded-full border border-dashed border-current flex items-center justify-center">
-            <span className="material-symbols-outlined text-sm">add</span>
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest">Add New Slot</span>
-        </button>
       </div>
     </motion.div>
   )

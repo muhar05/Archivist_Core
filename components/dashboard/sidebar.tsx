@@ -9,7 +9,6 @@ const navigation = [
   { name: "Records", href: "/records", icon: "inventory_2" },
   { name: "Locations", href: "/locations", icon: "location_on" },
   { name: "Loans", href: "/loans", icon: "assignment_return" },
-  { name: "Analytics", href: "/analytics", icon: "analytics" },
 ]
 
 export function Sidebar() {

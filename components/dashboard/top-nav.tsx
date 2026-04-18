@@ -1,5 +1,6 @@
 import React from "react"
 import Image from "next/image"
+import Link from "next/link"
 
 export function TopNav() {
   return (
@@ -29,14 +30,14 @@ export function TopNav() {
           </button>
         </div>
         
-        <div className="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/30 relative">
+        <Link href="/profile" className="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/30 relative hover:ring-2 hover:ring-primary/20 transition-all active:scale-90 cursor-pointer">
           <Image 
             alt="Administrator Profile" 
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOW-1IqVwBzIOa0YJpcyGGRtFecljvKcAKGG-rH4e5tekuFOnNfE8qOze9R4NVd4GkRmA077fX5JH6Pu_atjwAyjmOyXnNpgKG0nTJHTaYXDOJ4HkYqpdo0e13LI8i9cT8B6oJbBq6qOuAbnbyQvDu7PeHut2wReFFe7B9I4VKjvbntW3SA-HK-V7wGixBruohwGXw5OujITz6dA94z8G3KpmIBLW76zz2-bQ7QAVdUiV7uDqk2c4Sm3fznZ_yzVA3JK7bWNVdj-JQ"
             fill
             className="object-cover"
           />
-        </div>
+        </Link>
       </div>
     </header>
   )
