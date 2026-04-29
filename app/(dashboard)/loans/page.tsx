@@ -104,7 +104,7 @@ export default function LoansPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.1 }}
-            className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-outline-variant/10 shadow-xl shadow-slate-200/50 flex flex-col gap-4 group hover:border-primary/20 transition-all"
+            className="bg-white dark:bg-slate-900 p-6 rounded-4xl border border-outline-variant/10 shadow-xl shadow-slate-200/50 flex flex-col gap-4 group hover:border-primary/20 transition-all"
           >
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stat.color} group-hover:scale-110 transition-transform`}>
               <span className="material-symbols-outlined">{stat.icon}</span>

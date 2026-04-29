@@ -1,4 +1,4 @@
-export type StorageType = 'ROOM' | 'RACK' | 'ROW' | 'BOX' | 'WALL';
+export type StorageType = 'ROOM' | 'RACK' | 'ROW' | 'BOX' | 'WALL' | 'SHELF' | 'DIVIDER';
 
 export type RecordStatus = 'ACTIVE' | 'BORROWED' | 'ARCHIVED' | 'DISPOSED' | 'PENDING';
 export type RecordPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -22,6 +22,9 @@ export interface StorageUnit {
   height?: number;
   texture?: 'METAL' | 'WOOD' | 'GLASS';
   stackOrder?: number;
+  
+  // Designer Data (for front elevation / internal layout)
+  verticalPos?: number; // 0-100 percentage from top
 }
 
 export interface StoredReport {

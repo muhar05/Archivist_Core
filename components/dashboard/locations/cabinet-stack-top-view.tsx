@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { StorageUnit } from "./types"
 import { Layers } from "lucide-react"
@@ -10,9 +9,6 @@ interface CabinetStackTopViewProps {
   gridSize?: number;
   onClick: () => void;
   onDoubleClick: () => void;
-  onDragUpdate: (id: string, x: number, y: number) => void;
-  onRemove: (id: string) => void;
-  containerRef: React.RefObject<HTMLDivElement>;
   viewMode?: 'TOP' | 'ISO';
 }
 
@@ -21,9 +17,6 @@ export function CabinetStackTopView({
   gridSize = 50, 
   onClick, 
   onDoubleClick, 
-  onDragUpdate, 
-  onRemove, 
-  containerRef,
   viewMode = 'TOP'
 }: CabinetStackTopViewProps) {
   const topUnit = [...units].sort((a, b) => (b.stackOrder || 0) - (a.stackOrder || 0))[0];
@@ -73,7 +66,7 @@ export function CabinetStackTopView({
               }}
             >
                {/* Stacking indicator on front face */}
-               <div className="flex flex-col h-full [transform:rotateX(0deg)]">
+               <div className="flex flex-col h-full transform-[rotateX(0deg)]">
                   {[...Array(units.length)].map((_, i) => (
                     <div key={i} className="flex-1 border-t border-black/20" />
                   ))}

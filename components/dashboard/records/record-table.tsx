@@ -48,7 +48,7 @@ export function RecordTable({ records }: RecordTableProps) {
       </div>
 
       {/* Main Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-outline-variant/10 shadow-xl shadow-slate-200/50 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-4xl border border-outline-variant/10 shadow-xl shadow-slate-200/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

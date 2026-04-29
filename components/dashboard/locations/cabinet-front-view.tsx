@@ -1,9 +1,10 @@
 "use client"
 
-import React from "react"
-import { motion, PanInfo } from "framer-motion"
+import React, { useState, useMemo } from "react"
+import { motion } from "framer-motion"
 import { StorageUnit } from "./types"
-import { Archive, Lock, Info } from "lucide-react"
+import { Archive, Lock, Hammer } from "lucide-react"
+import { CabinetDesigner } from "./cabinet-designer"
 
 interface CabinetFrontViewProps {
   stack: StorageUnit[];
@@ -12,23 +13,32 @@ interface CabinetFrontViewProps {
 }
 
 export function CabinetFrontView({ stack, onLockerClick, onBack }: CabinetFrontViewProps) {
+  const [designingUnitId, setDesigningUnitId] = useState<string | null>(null);
+
   // Sort stack from top to bottom (highest stackOrder first)
   const sortedStack = [...stack].sort((a, b) => (b.stackOrder || 0) - (a.stackOrder || 0));
   const mainCabinet = sortedStack[0];
 
-  const handleDragEnd = (idx: number, info: PanInfo) => {
-    // In a real app, calculate new index based on drop position
-    // For now, we'll demonstrate the capability
-    if (Math.abs(info.offset.x) > 50 || Math.abs(info.offset.y) > 50) {
-      console.log(`Reordering locker at index ${idx}`);
-      // Notify parent of potential reorder
-    }
-  };
+  const designingUnit = useMemo(() => 
+    stack.find(u => u.id === designingUnitId), 
+    [stack, designingUnitId]
+  );
+
+  if (designingUnit) {
+    return (
+      <CabinetDesigner 
+        unit={designingUnit} 
+        onBack={() => setDesigningUnitId(null)} 
+        onSave={() => setDesigningUnitId(null)}
+        onLockerClick={onLockerClick}
+      />
+    );
+  }
 
   return (
     <motion.div 
       layoutId={`cabinet-stack-${mainCabinet.x}-${mainCabinet.y}`}
-      className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 flex flex-col p-8 rounded-4xl border-12 border-slate-800 shadow-2xl overflow-hidden"
+      className="absolute inset-0 z-50 bg-slate-100 dark:bg-slate-950 flex flex-col p-8 rounded-4xl border-16 border-slate-800 shadow-2xl overflow-hidden"
     >
       {/* Header */}
       <div className="flex justify-between items-center mb-10 px-4">
@@ -40,44 +50,42 @@ export function CabinetFrontView({ stack, onLockerClick, onBack }: CabinetFrontV
             ← BACK TO ROOM
           </button>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Archive</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Archive elevation</span>
             <span className="text-slate-300">/</span>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Floor {mainCabinet.x},{mainCabinet.y}</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Coord {mainCabinet.x},{mainCabinet.y}</span>
           </div>
           <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white mb-2">
-            Vertical Storage Stack
+            Storage Matrix <span className="text-slate-300 font-light">Stack Overview</span>
           </h2>
-          <div className="flex items-center gap-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              {stack.length} Units Stacked
-            </p>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Operational
-            </p>
-          </div>
         </div>
       </div>
 
       {/* Vertical Stack List */}
       <div className="flex-1 space-y-12 overflow-y-auto px-4 pb-12 scrollbar-thin">
         {sortedStack.map((cabinet, sIdx) => {
-          const lockers = cabinet.children || [];
+          const lockers = cabinet.children?.filter(c => c.type !== 'DIVIDER') || [];
           return (
             <div key={cabinet.id} className="space-y-6">
-              <div className="flex items-center gap-3">
-                 <div className="px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg">
-                   LEVEL {stack.length - sIdx}
-                 </div>
-                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                   {cabinet.name}
-                 </h3>
-                 <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <div className="px-3 py-1 bg-primary text-white text-[9px] font-black rounded-lg">
+                     LEVEL {stack.length - sIdx}
+                   </div>
+                   <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                     {cabinet.name}
+                   </h3>
+                </div>
+                <button 
+                  onClick={() => setDesigningUnitId(cabinet.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all"
+                >
+                  <Hammer className="w-3 h-3" />
+                  Redesign Internals
+                </button>
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                {lockers.map((locker, idx) => {
+                {lockers.map((locker) => {
                   const isFull = (locker.currentLoad || 0) >= (locker.capacity || 1);
                   return (
                     <motion.div
@@ -104,11 +112,6 @@ export function CabinetFrontView({ stack, onLockerClick, onBack }: CabinetFrontV
                     </motion.div>
                   )
                 })}
-
-                <button className="border-2 border-dashed border-outline-variant/20 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-primary transition-all min-h-[120px]">
-                  <span className="material-symbols-outlined text-sm">add</span>
-                  <span className="text-[9px] font-black uppercase tracking-widest">New Slot</span>
-                </button>
               </div>
             </div>
           )

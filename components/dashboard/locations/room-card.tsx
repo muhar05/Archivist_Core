@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Building2, Layers, MapPin, Users } from "lucide-react"
+import { Building2, MapPin } from "lucide-react"
 import { StorageUnit } from "./types"
 import { buttonSpring } from "@/constants/animations"
 
