@@ -31,16 +31,16 @@ export function RecordTable({ records }: RecordTableProps) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Cari judul, kode, atau kategori..."
-            className="w-full bg-white dark:bg-slate-900 border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-3.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+            className="w-full bg-white dark:bg-slate-900 border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-3.5 text-sm outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
           />
         </div>
         
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all shadow-sm shadow-slate-200/50">
+          <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all">
             <span className="material-symbols-outlined text-sm">filter_list</span>
             Filters
           </button>
-          <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all shadow-sm shadow-slate-200/50">
+          <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all">
             <span className="material-symbols-outlined text-sm">file_download</span>
             Export
           </button>
@@ -48,7 +48,7 @@ export function RecordTable({ records }: RecordTableProps) {
       </div>
 
       {/* Main Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-4xl border border-outline-variant/10 shadow-xl shadow-slate-200/50 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-4xl border border-outline-variant/10 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -131,7 +131,7 @@ export function RecordTable({ records }: RecordTableProps) {
           <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-slate-400 disabled:opacity-30" disabled>
             <span className="material-symbols-outlined">chevron_left</span>
           </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary text-white font-black text-xs shadow-lg shadow-primary/20">
+          <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary text-white font-black text-xs">
             1
           </button>
           <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-slate-400">

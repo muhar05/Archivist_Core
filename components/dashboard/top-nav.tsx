@@ -2,20 +2,27 @@ import React from "react"
 import Image from "next/image"
 import Link from "next/link"
 
-export function TopNav() {
+export function TopNav({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
-    <header className="flex justify-between items-center w-full px-6 py-3 sticky top-0 z-50 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-outline-variant/10 font-heading antialiased tracking-tight">
-      <div className="flex items-center gap-8">
-        <span className="text-xl font-extrabold text-primary dark:text-white">Physical Records Management</span>
-        <div className="hidden md:flex items-center bg-slate-200/50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-transparent focus-within:border-primary/20 transition-all">
+    <header className="flex justify-between items-center w-full px-4 md:px-6 py-3 sticky top-0 z-40 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 font-heading antialiased tracking-tight">
+      <div className="flex items-center gap-4 md:gap-8">
+        <button 
+          onClick={onMenuClick}
+          className="p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer rounded-lg lg:hidden"
+        >
+          <span className="material-symbols-outlined">menu</span>
+        </button>
+        <span className="text-lg md:xl font-extrabold text-primary dark:text-white truncate">Physical Records Management</span>
+        <div className="hidden lg:flex items-center bg-slate-200/50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-transparent focus-within:border-primary/20 transition-all">
           <span className="material-symbols-outlined text-slate-500 text-sm">search</span>
           <input 
-            className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder-slate-400 outline-none" 
+            className="bg-transparent border-none focus:ring-0 text-sm w-48 xl:w-64 placeholder-slate-400 outline-none" 
             placeholder="Search archives..." 
             type="text"
           />
         </div>
       </div>
+
       
       <div className="flex items-center gap-4">
         <div className="flex gap-2">

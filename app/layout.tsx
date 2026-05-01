@@ -28,6 +28,9 @@ export const metadata: Metadata = {
   description: "Bridge the gap between physical storage and digital efficiency. A customizable warehouse management system designed to track, locate, and manage hardcopy reports with precision.",
 };
 
+import QueryProvider from "@/providers/QueryProvider";
+import ThemeProvider from "@/providers/ThemeProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -46,14 +49,17 @@ export default function RootLayout({
         />
       </head>
 
-      <body className="min-h-full flex flex-col">
-
-
-        {children}
-        <Toaster position="top-right" richColors />
+      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+        <QueryProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster position="top-right" richColors />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );
 }
+
 
 

@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { useState } from "react"
-import { createClient } from "@/utils/supabase/client"
+import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Image from "next/image"
@@ -25,9 +25,8 @@ import { LANDING_ASSETS } from "@/constants/assets"
 import { buttonSpring } from "@/constants/animations"
 
 export default function LoginPage() {
-  const supabase = createClient()
-  const [email, setEmail] = useState<string>("admin@test.com")
-  const [password, setPassword] = useState<string>("")
+  const [email, setEmail] = useState<string>("admin@prms.local")
+  const [password, setPassword] = useState<string>("admin123")
   const [showPassword, setShowPassword] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
   const router = useRouter()
@@ -37,21 +36,20 @@ export default function LoginPage() {
     setLoading(true)
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const res = await signIn("credentials", {
         email,
         password,
+        redirect: false,
       })
 
-      if (error) {
-        toast.error("Gagal Login", { description: error.message })
+      if (res?.error) {
+        toast.error("Gagal Login", { description: "Email atau password salah" })
         return
       }
 
-      if (data.user) {
-        toast.success("Berhasil Masuk", { description: "Mengarahkan ke dashboard..." })
-        router.push("/dashboard")
-        router.refresh()
-      }
+      toast.success("Berhasil Masuk", { description: "Mengarahkan ke dashboard..." })
+      router.push("/")
+      router.refresh()
     } catch (err) {
       console.error(err)
       toast.error("Terjadi kesalahan sistem")
@@ -59,6 +57,7 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="bg-surface font-body text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen antialiased">
