@@ -88,6 +88,9 @@ export default function LocationDetailPage() {
                 units={subUnits || []} 
                 onUnitSelect={(u) => u && router.push(`/location/${u.id}`)}
                 onUnitMove={() => {}} // Read-only for navigation
+                gridWidth={unit.room?.grid_width || 50}
+                gridHeight={unit.room?.grid_height || 50}
+                readOnly={true}
               />
             </div>
           </div>

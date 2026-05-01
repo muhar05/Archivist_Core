@@ -3,10 +3,14 @@
 import React, { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getRoomsAction, getStorageUnitsAction, createStorageUnitAction, createRoomAction, batchUpdateStorageUnitsAction, getSubUnitsAction, updateRoomAction, deleteRoomAction, deleteStorageUnitAction } from "@/actions/locationActions"
-import { StorageUnit, StorageUnitInsert } from "@/services/locationService"
+import { StorageUnit as DBStorageUnit, StorageUnitInsert } from "@/services/locationService"
+import { StorageUnit as UIStorageUnit } from "@/components/dashboard/locations/types"
 import { ArchitectCanvas } from "@/components/dashboard/locations/ArchitectCanvas"
-import { motion } from "framer-motion"
+import { AddRoomDialog } from "@/components/dashboard/locations/add-room-dialog"
+import { CabinetFrontView } from "@/components/dashboard/locations/cabinet-front-view"
+import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
+import { Box, Layout, Save, Plus, Trash2, Settings2, LogIn, Grid } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,19 +25,20 @@ import {
 export default function ArchitectPage() {
   const queryClient = useQueryClient()
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
-  const [selectedUnit, setSelectedUnit] = useState<StorageUnit | null>(null)
+  const [selectedUnit, setSelectedUnit] = useState<DBStorageUnit | null>(null)
   
   // Local state for Canvas
-  const [localUnits, setLocalUnits] = useState<StorageUnit[]>([])
+  const [localUnits, setLocalUnits] = useState<DBStorageUnit[]>([])
+  const [localSubUnits, setLocalSubUnits] = useState<DBStorageUnit[]>([])
   const [unsavedChanges, setUnsavedChanges] = useState(false)
   
   // New/Edit Room State
   const [isAddingRoom, setIsAddingRoom] = useState(false)
   const [isEditingRoom, setIsEditingRoom] = useState(false)
+  const [isLocked, setIsLocked] = useState(false)
+  const [viewMode, setViewMode] = useState<'GRID' | 'ELEVATION'>('GRID')
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null)
   const [unitToDelete, setUnitToDelete] = useState<{id: string, type: 'unit' | 'locker'} | null>(null)
-  const [newRoomName, setNewRoomName] = useState("")
-  const [newRoomFloor, setNewRoomFloor] = useState(1)
   const [newRoomGridWidth, setNewRoomGridWidth] = useState(50)
   const [newRoomGridHeight, setNewRoomGridHeight] = useState(50)
 
@@ -53,9 +58,11 @@ export default function ArchitectPage() {
   // Sync db units to local state
   useEffect(() => {
     if (units) {
-      // eslint-disable-next-line
-      setLocalUnits(units)
-      setUnsavedChanges(false)
+      const timer = setTimeout(() => {
+        setLocalUnits(units)
+        setUnsavedChanges(false)
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [units])
 
@@ -63,8 +70,20 @@ export default function ArchitectPage() {
   const { data: subUnits } = useQuery({
     queryKey: ["sub-units", selectedUnit?.id],
     queryFn: () => getSubUnitsAction(selectedUnit!.id),
-    enabled: !!selectedUnit
+    enabled: !!selectedUnit && !selectedUnit.id.startsWith('temp-')
   })
+
+  // Sync sub-units to local state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (subUnits) {
+        setLocalSubUnits(subUnits)
+      } else {
+        setLocalSubUnits([])
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [subUnits])
 
   // Mutations
   const batchUpdateMutation = useMutation({
@@ -96,11 +115,8 @@ export default function ArchitectPage() {
       queryClient.invalidateQueries({ queryKey: ["rooms"] })
       toast.success("New room created")
       setIsAddingRoom(false)
-      setNewRoomName("")
-      setNewRoomFloor(1)
-      setNewRoomGridWidth(50)
-      setNewRoomGridHeight(50)
-      if (data && data.id) setSelectedRoomId(data.id)
+      const res = data as { id: string } | null
+      if (res?.id) setSelectedRoomId(res.id)
     }
   })
 
@@ -140,25 +156,7 @@ export default function ArchitectPage() {
     }
   })
 
-  const handleAddRoom = () => {
-    if (!newRoomName.trim()) return toast.error("Room name is required")
-    if (newRoomGridWidth > 200 || newRoomGridHeight > 200) return toast.error("Maximum grid size is 200px")
-    if (newRoomGridWidth < 10 || newRoomGridHeight < 10) return toast.error("Minimum grid size is 10px")
-    
-    createRoomMutation.mutate({ 
-      name: newRoomName, 
-      floor_number: newRoomFloor,
-      grid_width: newRoomGridWidth,
-      grid_height: newRoomGridHeight
-    })
-  }
 
-  const handleCancelAddRoom = () => {
-    if (window.confirm("Batal membuat ruangan baru? Data yang sudah diisi akan hilang.")) {
-      setIsAddingRoom(false)
-      window.location.href = "/admin/architect"
-    }
-  }
 
   const handleEditRoom = () => {
     if (newRoomGridWidth > 200 || newRoomGridHeight > 200) return toast.error("Maximum grid size is 200px")
@@ -195,15 +193,24 @@ export default function ArchitectPage() {
   const handleAddUnit = () => {
     if (!selectedRoomId) return toast.error("Please select a room first")
     
-    createUnitMutation.mutate({
+    const newUnit: DBStorageUnit = {
+      id: `temp-${Date.now()}`,
       room_id: selectedRoomId,
-      name: `Unit ${ (units?.length || 0) + 1 }`,
+      parent_id: null,
+      name: `Unit ${ (localUnits.length || 0) + 1 }`,
       x: 100,
       y: 100,
       z: 0,
+      width: 100,
+      height: 100,
       is_assignable: false,
-      status: "available"
-    })
+      status: "available",
+      created_at: new Date()
+    }
+
+    setLocalUnits(prev => [...prev, newUnit])
+    setSelectedUnit(newUnit)
+    setUnsavedChanges(true)
   }
 
   const handleUnitMove = (id: string, x: number, y: number) => {
@@ -230,21 +237,101 @@ export default function ArchitectPage() {
     }
   }
 
-  const handleSaveLayout = () => {
-    const updates = localUnits.map(u => ({ id: u.id, x: u.x, y: u.y, width: u.width, height: u.height, name: u.name }))
-    batchUpdateMutation.mutate(updates)
+  const handleSaveLayout = async () => {
+    // Separate into updates and creations
+    const toUpdate = localUnits.filter(u => !u.id.startsWith('temp-')).map(u => ({ 
+      id: u.id, 
+      x: u.x, 
+      y: u.y, 
+      width: Number(u.width), 
+      height: Number(u.height), 
+      name: u.name 
+    }))
+
+    const toCreate = localUnits.filter(u => u.id.startsWith('temp-'))
+    const lockersToCreate = localSubUnits.filter(u => u.id.startsWith('temp-'))
+
+    try {
+      if (toUpdate.length > 0) {
+        await batchUpdateMutation.mutateAsync(toUpdate)
+      }
+
+      // Create Units
+      const tempToRealIdMap: Record<string, string> = {}
+      if (toCreate.length > 0) {
+        for (const unit of toCreate) {
+          const created = await createUnitMutation.mutateAsync({
+            room_id: unit.room_id,
+            name: unit.name,
+            x: unit.x,
+            y: unit.y,
+            z: unit.z,
+            width: unit.width,
+            height: unit.height,
+            is_assignable: unit.is_assignable,
+            status: unit.status
+          }) as { id: string } | null
+          if (created?.id) tempToRealIdMap[unit.id] = created.id
+        }
+      }
+
+      // Create Lockers
+      if (lockersToCreate.length > 0) {
+        for (const locker of lockersToCreate) {
+          // Resolve parent_id if it was a temp ID
+          const parentId = locker.parent_id?.startsWith('temp-') 
+            ? tempToRealIdMap[locker.parent_id] 
+            : locker.parent_id
+
+          if (parentId) {
+            await createUnitMutation.mutateAsync({
+              room_id: locker.room_id,
+              parent_id: parentId,
+              name: locker.name,
+              x: locker.x,
+              y: locker.y,
+              z: locker.z,
+              width: locker.width,
+              height: locker.height,
+              is_assignable: locker.is_assignable,
+              status: locker.status
+            })
+          }
+        }
+      }
+      
+      toast.success("Changes saved successfully")
+      setUnsavedChanges(false)
+      queryClient.invalidateQueries({ queryKey: ["units", selectedRoomId] })
+      if (selectedUnit) queryClient.invalidateQueries({ queryKey: ["sub-units", selectedUnit.id] })
+    } catch {
+      toast.error("Failed to save changes")
+    }
   }
 
   const handleAddLocker = () => {
     if (!selectedUnit) return;
-    createUnitMutation.mutate({
+    
+    const newLocker: DBStorageUnit = {
+      id: `temp-locker-${Date.now()}`,
       room_id: selectedUnit.room_id,
       parent_id: selectedUnit.id,
-      name: `Locker ${ (subUnits?.length || 0) + 1 }`,
-      x: 0, y: 0, z: (subUnits?.length || 0) + 1,
+      name: `Locker ${ (localSubUnits.length || 0) + 1 }`,
+      x: 0, y: 0, z: (localSubUnits.length || 0) + 1,
+      width: 50,
+      height: 50,
       is_assignable: true,
-      status: "available"
-    })
+      status: "available",
+      created_at: new Date()
+    }
+
+    setLocalSubUnits(prev => [...prev, newLocker])
+    setUnsavedChanges(true)
+  }
+
+  const handleEnterCabinet = () => {
+    if (!selectedUnit) return;
+    setViewMode('ELEVATION');
   }
 
   return (
@@ -273,6 +360,23 @@ export default function ArchitectPage() {
           </select>
 
           <button 
+            onClick={() => setIsLocked(!isLocked)}
+            className={`p-2 rounded-lg transition-all flex items-center gap-2 px-3 ${
+              isLocked 
+                ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" 
+                : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+            }`}
+            title={isLocked ? "Unlock Grid to Move Units" : "Lock Grid to Prevent Movement"}
+          >
+            <span className="material-symbols-outlined text-sm">
+              {isLocked ? "lock" : "lock_open"}
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {isLocked ? "Grid Locked" : "Grid Editable"}
+            </span>
+          </button>
+
+          <button 
             onClick={openEditRoomModal}
             disabled={!selectedRoomId}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all disabled:opacity-50"
@@ -291,61 +395,113 @@ export default function ArchitectPage() {
           </button>
 
           <button 
-            onClick={() => {
-              setNewRoomName("")
-              setNewRoomFloor(1)
-              setNewRoomGridWidth(50)
-              setNewRoomGridHeight(50)
-              setIsAddingRoom(true)
-            }}
+            onClick={() => setIsAddingRoom(true)}
             className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-700 hover:bg-slate-700 transition-all flex items-center gap-2"
           >
-            <span className="material-symbols-outlined text-sm">add_business</span>
+            <Plus className="w-4 h-4" />
             Add Room
           </button>
 
           <button 
             onClick={handleSaveLayout}
-            disabled={!unsavedChanges || batchUpdateMutation.isPending}
+            disabled={!unsavedChanges || batchUpdateMutation.isPending || viewMode === 'ELEVATION'}
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
-              unsavedChanges 
+              unsavedChanges && viewMode === 'GRID'
                 ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" 
                 : "bg-slate-800 text-slate-500 border border-slate-700 opacity-50 cursor-not-allowed"
             }`}
           >
-            <span className="material-symbols-outlined text-sm">save</span>
+            <Save className="w-4 h-4" />
             Save Layout
           </button>
 
           <button 
             onClick={handleAddUnit}
-            disabled={!selectedRoomId}
+            disabled={!selectedRoomId || viewMode === 'ELEVATION'}
             className="primary-gradient text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <Plus className="w-4 h-4" />
             Add Unit
           </button>
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6 overflow-hidden">
+      <div className="flex flex-1 gap-6 overflow-hidden relative">
         {/* Canvas Area */}
-        <div className="flex-1 min-h-[500px]">
-          {!selectedRoomId ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900/30 rounded-xl border border-dashed border-slate-800 text-slate-500">
-              <span className="material-symbols-outlined text-5xl mb-4 opacity-20">grid_view</span>
-              <p>Please select a room to start designing</p>
-            </div>
-          ) : (
-            <ArchitectCanvas 
-              units={localUnits} 
-              selectedUnitId={selectedUnit?.id}
-              onUnitSelect={setSelectedUnit}
-              onUnitMove={handleUnitMove}
-              gridWidth={rooms?.find(r => r.id === selectedRoomId)?.grid_width || 50}
-              gridHeight={rooms?.find(r => r.id === selectedRoomId)?.grid_height || 50}
-            />
-          )}
+        <div className="flex-1 min-h-[500px] relative">
+          <AnimatePresence mode="wait">
+            {!selectedRoomId ? (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full h-full flex flex-col items-center justify-center bg-slate-900/30 rounded-xl border border-dashed border-slate-800 text-slate-500"
+              >
+                <Layout className="w-12 h-12 mb-4 opacity-20" />
+                <p>Please select a room to start designing</p>
+              </motion.div>
+            ) : viewMode === 'GRID' ? (
+              <motion.div 
+                key="grid"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                className="w-full h-full"
+              >
+                <ArchitectCanvas 
+                  units={localUnits} 
+                  selectedUnitId={selectedUnit?.id}
+                  onUnitSelect={setSelectedUnit}
+                  onUnitMove={handleUnitMove}
+                  gridWidth={rooms?.find(r => r.id === selectedRoomId)?.grid_width || 50}
+                  gridHeight={rooms?.find(r => r.id === selectedRoomId)?.grid_height || 50}
+                  readOnly={isLocked}
+                />
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="elevation"
+                initial={{ opacity: 0, x: 100 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -100 }}
+                className="w-full h-full"
+              >
+                <CabinetFrontView 
+                  stack={selectedUnit ? [{ 
+                    ...selectedUnit, 
+                    type: 'BOX',
+                    parentId: selectedUnit.parent_id,
+                    path: selectedUnit.id,
+                    children: localSubUnits?.map(s => ({
+                      ...s,
+                      type: 'BOX',
+                      parentId: s.parent_id,
+                      path: s.id
+                    })) as UIStorageUnit[]
+                  } as UIStorageUnit] : []} 
+                  onLockerClick={() => {}}
+                  onBack={() => setViewMode('GRID')}
+                />
+                
+                {/* Elevation Controls */}
+                <div className="absolute top-6 right-6 z-50 flex flex-col items-end gap-2">
+                   <button 
+                     onClick={handleAddLocker}
+                     className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
+                   >
+                     <Plus className="w-4 h-4" />
+                     Add Locker to {selectedUnit?.name}
+                   </button>
+                   {selectedUnit?.id.startsWith('temp-') && (
+                     <div className="bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg">
+                       <p className="text-[9px] text-amber-500 font-bold uppercase tracking-wider">Save layout first to persist lockers</p>
+                     </div>
+                   )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Sidebar Info */}
@@ -356,7 +512,7 @@ export default function ArchitectPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-400">
-              <span className="material-symbols-outlined text-sm">info</span>
+              <Settings2 className="w-4 h-4" />
               <span className="text-xs font-bold uppercase tracking-widest">Properties</span>
             </div>
             {selectedUnit && (
@@ -365,7 +521,7 @@ export default function ArchitectPage() {
                 className="p-1.5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-md transition-colors"
                 title="Delete Unit"
               >
-                <span className="material-symbols-outlined text-sm">delete</span>
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -381,6 +537,17 @@ export default function ArchitectPage() {
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
+
+              {viewMode === 'GRID' && (
+                <button 
+                  onClick={handleEnterCabinet}
+                  className="w-full py-4 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] border border-slate-700 hover:bg-slate-700 transition-all flex items-center justify-center gap-3 group"
+                >
+                  <LogIn className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  Enter Cabinet Elevation
+                </button>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">X Position</label>
@@ -401,9 +568,10 @@ export default function ArchitectPage() {
                   <input 
                     type="number" 
                     step={50}
-                    value={selectedUnit.width}
-                    onChange={(e) => handleUnitResize(selectedUnit.id, parseInt(e.target.value) || 50, selectedUnit.height)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
+                    disabled={viewMode === 'ELEVATION'}
+                    value={selectedUnit.width || 100}
+                    onChange={(e) => handleUnitResize(selectedUnit.id, parseInt(e.target.value) || 0, selectedUnit.height || 100)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono disabled:opacity-50"
                   />
                 </div>
                 <div>
@@ -411,38 +579,39 @@ export default function ArchitectPage() {
                   <input 
                     type="number" 
                     step={50}
-                    value={selectedUnit.height}
-                    onChange={(e) => handleUnitResize(selectedUnit.id, selectedUnit.width, parseInt(e.target.value) || 50)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
+                    disabled={viewMode === 'ELEVATION'}
+                    value={selectedUnit.height || 100}
+                    onChange={(e) => handleUnitResize(selectedUnit.id, selectedUnit.width || 100, parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono disabled:opacity-50"
                   />
                 </div>
               </div>
-              <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10 mb-4">
-                <p className="text-[10px] text-blue-400/80 italic">Drag units on the canvas and click &apos;Save Layout&apos; to persist changes.</p>
-              </div>
+              
+              {viewMode === 'GRID' && (
+                <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10 mb-4">
+                  <p className="text-[10px] text-blue-400/80 italic">Drag units on the canvas and click &apos;Save Layout&apos; to persist changes.</p>
+                </div>
+              )}
 
-              {/* Sub-Units (Lockers) Section */}
+              {/* Sub-Units (Lockers) Section - Quick View */}
               <div className="pt-4 border-t border-slate-800">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-[10px] uppercase font-bold text-slate-500">Lockers (Sub-units)</label>
-                  <button 
-                    onClick={handleAddLocker}
-                    className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-blue-400 bg-primary/10 px-2 py-1 rounded-md"
-                  >
-                    <span className="material-symbols-outlined text-xs">add</span> Add Locker
-                  </button>
+                  <label className="text-[10px] uppercase font-bold text-slate-500">Lockers Matrix</label>
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                    {subUnits?.length || 0} Slots
+                  </span>
                 </div>
                 
                 <div className="space-y-2">
-                  {!subUnits || subUnits.length === 0 ? (
+                  {!localSubUnits || localSubUnits.length === 0 ? (
                     <div className="p-4 border border-dashed border-slate-800 rounded-lg text-center text-xs text-slate-500">
                       No lockers in this cabinet.
                     </div>
                   ) : (
-                    subUnits.map(locker => (
+                    localSubUnits.map(locker => (
                       <div key={locker.id} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg border border-slate-800/50">
                         <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-slate-500 text-sm">inventory_2</span>
+                          <Box className="w-4 h-4 text-slate-500" />
                           <span className="text-xs font-bold text-slate-300">{locker.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -457,7 +626,7 @@ export default function ArchitectPage() {
                             className="p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-md transition-colors"
                             title="Delete Locker"
                           >
-                            <span className="material-symbols-outlined text-[10px]">delete</span>
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -468,7 +637,7 @@ export default function ArchitectPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-600">
-              <span className="material-symbols-outlined text-4xl mb-2">touch_app</span>
+              <Grid className="w-10 h-10 mb-2 opacity-20" />
               <p className="text-xs">Select a unit on the grid to view its properties</p>
             </div>
           )}
@@ -476,72 +645,11 @@ export default function ArchitectPage() {
       </div>
 
       {/* Add Room Modal */}
-      {isAddingRoom && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl"
-          >
-            <h2 className="text-xl font-bold text-white mb-4">Create New Room</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Room Name</label>
-                <input 
-                  type="text" 
-                  value={newRoomName}
-                  onChange={e => setNewRoomName(e.target.value)}
-                  placeholder="e.g. Vault A, Main Warehouse"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Floor Number</label>
-                <input 
-                  type="number" 
-                  value={newRoomFloor}
-                  onChange={e => setNewRoomFloor(parseInt(e.target.value) || 1)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Grid Width (10-200px)</label>
-                  <input 
-                    type="number" 
-                    value={newRoomGridWidth}
-                    onChange={e => setNewRoomGridWidth(parseInt(e.target.value) || 50)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 transition-colors font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Grid Height (10-200px)</label>
-                  <input 
-                    type="number" 
-                    value={newRoomGridHeight}
-                    onChange={e => setNewRoomGridHeight(parseInt(e.target.value) || 50)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 transition-colors font-mono"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button 
-                  onClick={handleCancelAddRoom}
-                  className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-sm font-bold border border-slate-700 hover:bg-slate-700 transition-all"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleAddRoom}
-                  className="flex-1 primary-gradient text-white px-4 py-3 rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-all"
-                >
-                  Create Room
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <AddRoomDialog 
+        isOpen={isAddingRoom}
+        onClose={() => setIsAddingRoom(false)}
+        onAdd={(config) => createRoomMutation.mutate(config)}
+      />
 
       {/* Edit Room Grid Modal */}
       {isEditingRoom && (

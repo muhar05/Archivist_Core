@@ -11,6 +11,7 @@ interface ArchitectCanvasProps {
   selectedUnitId?: string
   gridWidth: number
   gridHeight: number
+  readOnly?: boolean
 }
 
 export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
@@ -19,7 +20,8 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
   onUnitSelect,
   selectedUnitId,
   gridWidth,
-  gridHeight
+  gridHeight,
+  readOnly = false
 }) => {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
@@ -77,7 +79,6 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
       <Stage 
         width={dimensions.width} 
         height={dimensions.height} 
-        draggable
       >
         <Layer>
           {renderGrid()}
@@ -88,7 +89,7 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
               key={unit.id}
               x={unit.x}
               y={unit.y}
-              draggable
+              draggable={!readOnly}
               onDragEnd={(e) => {
                 const newX = Math.round(e.target.x() / gridWidth) * gridWidth
                 const newY = Math.round(e.target.y() / gridHeight) * gridHeight
@@ -98,8 +99,8 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
               onTap={() => onUnitSelect(unit)}
             >
               <Rect
-                width={unit.width || 100}
-                height={unit.height || 100}
+                width={Number(unit.width) || 100}
+                height={Number(unit.height) || 100}
                 fill={selectedUnitId === unit.id ? "#3b82f6" : "#1e293b"}
                 stroke={selectedUnitId === unit.id ? "#60a5fa" : "#334155"}
                 strokeWidth={2}
@@ -109,8 +110,8 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
               />
               <Text
                 text={unit.name}
-                width={unit.width || 100}
-                height={unit.height || 100}
+                width={Number(unit.width) || 100}
+                height={Number(unit.height) || 100}
                 align="center"
                 verticalAlign="middle"
                 fill="white"

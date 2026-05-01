@@ -2,26 +2,25 @@
 
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Layout, Code, Users, Maximize2 } from "lucide-react"
+import { X, Layout, Maximize2 } from "lucide-react"
 
 interface AddRoomDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (config: { name: string; code: string; capacity: number; width: number; height: number }) => void;
+  onAdd: (config: { name: string; floor_number: number; grid_width: number; grid_height: number }) => void;
 }
 
 export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
   const [name, setName] = useState("")
-  const [code, setCode] = useState("")
-  const [capacity, setCapacity] = useState(100)
-  const [width, setWidth] = useState(14)
-  const [height, setHeight] = useState(12)
+  const [floorNumber, setFloorNumber] = useState(1)
+  const [gridWidth, setGridWidth] = useState(50)
+  const [gridHeight, setGridHeight] = useState(50)
 
   if (!isOpen) return null;
 
   const handleSubmit = () => {
-    if (!name || !code) return;
-    onAdd({ name, code, capacity, width, height });
+    if (!name) return;
+    onAdd({ name, floor_number: floorNumber, grid_width: gridWidth, grid_height: gridHeight });
     onClose();
   };
 
@@ -76,56 +75,43 @@ export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
                 />
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 col-span-2">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1 flex items-center gap-2">
-                  <Code className="w-3 h-3 text-primary" /> Area Code
-                </label>
-                <input 
-                  type="text"
-                  placeholder="SEC-A-01"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary/20 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1 flex items-center gap-2">
-                  <Users className="w-3 h-3 text-primary" /> Max Capacity
+                  <span className="material-symbols-outlined text-xs text-primary">layers</span> Floor Number
                 </label>
                 <input 
                   type="number"
-                  value={capacity}
-                  onChange={(e) => setCapacity(Number(e.target.value))}
+                  value={floorNumber}
+                  onChange={(e) => setFloorNumber(Number(e.target.value))}
                   className="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary/20 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
                 />
               </div>
             </div>
 
-            {/* Floorplan Dimensions */}
+            {/* Grid Configuration */}
             <div className="p-6 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-100 dark:border-slate-800">
                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Maximize2 className="w-4 h-4 text-primary" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Floor Dimensions</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Grid Precision</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">{width} × {height} Grid Units</span>
+                  <span className="text-[10px] font-mono text-slate-400">{gridWidth}px × {gridHeight}px</span>
                </div>
                
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Width Units</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Grid Width</span>
                     <input 
-                      type="range" min="8" max="40" step="1"
-                      value={width} onChange={(e) => setWidth(Number(e.target.value))}
+                      type="range" min="10" max="200" step="10"
+                      value={gridWidth} onChange={(e) => setGridWidth(Number(e.target.value))}
                       className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
                   <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Height Units</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Grid Height</span>
                     <input 
-                      type="range" min="8" max="40" step="1"
-                      value={height} onChange={(e) => setHeight(Number(e.target.value))}
+                      type="range" min="10" max="200" step="10"
+                      value={gridHeight} onChange={(e) => setGridHeight(Number(e.target.value))}
                       className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
@@ -144,7 +130,7 @@ export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleSubmit}
-              disabled={!name || !code}
+              disabled={!name}
               className="flex-1 py-5 bg-primary disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-black uppercase tracking-[0.2em] rounded-2xl shadow-2xl shadow-primary/30"
             >
               Start Building
