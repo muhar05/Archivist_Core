@@ -8,10 +8,12 @@ interface ArchitectCanvasProps {
   units: StorageUnit[]
   onUnitMove: (id: string, x: number, y: number) => void
   onUnitSelect: (unit: StorageUnit | null) => void
+  onUnitResize?: (id: string, width: number, height: number) => void
   selectedUnitId?: string
   gridWidth: number
   gridHeight: number
   readOnly?: boolean
+  backgroundLabel?: string
 }
 
 export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
@@ -21,7 +23,8 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
   selectedUnitId,
   gridWidth,
   gridHeight,
-  readOnly = false
+  readOnly = false,
+  backgroundLabel
 }) => {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
@@ -82,6 +85,18 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
       >
         <Layer>
           {renderGrid()}
+          {backgroundLabel && (
+            <Text 
+              text={backgroundLabel}
+              fontSize={100}
+              fontStyle="black"
+              fill="#1e293b"
+              opacity={0.3}
+              x={50}
+              y={50}
+              listening={false}
+            />
+          )}
         </Layer>
         <Layer>
           {units.map((unit) => (
@@ -90,12 +105,33 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
               x={unit.x}
               y={unit.y}
               draggable={!readOnly}
+              dragBoundFunc={(pos) => {
+                const width = Number(unit.width) || 100;
+                const height = Number(unit.height) || 100;
+                return {
+                  x: Math.max(0, Math.min(pos.x, dimensions.width - width)),
+                  y: Math.max(0, Math.min(pos.y, dimensions.height - height))
+                };
+              }}
               onDragEnd={(e) => {
-                const newX = Math.round(e.target.x() / gridWidth) * gridWidth
-                const newY = Math.round(e.target.y() / gridHeight) * gridHeight
+                const width = Number(unit.width) || 100;
+                const height = Number(unit.height) || 100;
+                const rawX = Math.round(e.target.x() / gridWidth) * gridWidth
+                const rawY = Math.round(e.target.y() / gridHeight) * gridHeight
+                
+                // Clamp snapped coordinates
+                const newX = Math.max(0, Math.min(rawX, dimensions.width - width))
+                const newY = Math.max(0, Math.min(rawY, dimensions.height - height))
+                
                 onUnitMove(unit.id, newX, newY)
               }}
               onClick={() => onUnitSelect(unit)}
+              onDblClick={() => {
+                onUnitSelect(unit);
+                // Trigger parent's enter action if applicable
+                const event = new CustomEvent('canvas-dblclick', { detail: unit });
+                window.dispatchEvent(event);
+              }}
               onTap={() => onUnitSelect(unit)}
             >
               <Rect

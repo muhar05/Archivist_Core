@@ -3,7 +3,8 @@
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { reportService } from "@/services/reportService"
-import { createClient } from "@/utils/supabase/client"
+import { useSession } from "next-auth/react"
+import { getAssignableUnitsAction } from "@/actions/locationActions"
 import { toast } from "sonner"
 
 const SOP_CHECKLIST = [
@@ -23,7 +24,7 @@ interface DepositFormData {
 
 export const DepositForm = () => {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const { data: session } = useSession()
   const [formData, setFormData] = useState<DepositFormData>({
     title: "",
     client: "",
@@ -35,18 +36,12 @@ export const DepositForm = () => {
   // Fetch assignable units
   const { data: units } = useQuery({
     queryKey: ["assignable-units"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("storage_units")
-        .select("*")
-        .eq("is_assignable", true)
-      return data || []
-    }
+    queryFn: () => getAssignableUnitsAction()
   })
 
   const mutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = session?.user as { id: string }
       if (!user) throw new Error("Unauthorized")
 
       return reportService.requestDeposit({

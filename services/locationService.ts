@@ -113,5 +113,11 @@ export const locationService = {
       .update(rooms)
       .set({ is_maintenance })
       .where(eq(rooms.id, room_id));
+  },
+
+  async getAssignableUnits() {
+    return await db.query.storageUnits.findMany({
+      where: eq(storageUnits.is_assignable, true)
+    });
   }
 };

@@ -1,13 +1,14 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getRoomsAction, getStorageUnitsAction, createStorageUnitAction, createRoomAction, batchUpdateStorageUnitsAction, getSubUnitsAction, updateRoomAction, deleteRoomAction, deleteStorageUnitAction } from "@/actions/locationActions"
-import { StorageUnit as DBStorageUnit, StorageUnitInsert } from "@/services/locationService"
-import { StorageUnit as UIStorageUnit } from "@/components/dashboard/locations/types"
+import { getReportsByUnitAction, requestDepositAction } from "@/actions/reportActions"
+import type { StorageUnit as DBStorageUnit, StorageUnitInsert } from "@/services/locationService"
 import { ArchitectCanvas } from "@/components/dashboard/locations/ArchitectCanvas"
 import { AddRoomDialog } from "@/components/dashboard/locations/add-room-dialog"
-import { CabinetFrontView } from "@/components/dashboard/locations/cabinet-front-view"
+import { LockerView } from "@/components/dashboard/locations/LockerView"
+import { useSession } from "next-auth/react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { Box, Layout, Save, Plus, Trash2, Settings2, LogIn, Grid } from "lucide-react"
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function ArchitectPage() {
+  const { data: session } = useSession()
   const queryClient = useQueryClient()
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [selectedUnit, setSelectedUnit] = useState<DBStorageUnit | null>(null)
@@ -30,17 +32,22 @@ export default function ArchitectPage() {
   // Local state for Canvas
   const [localUnits, setLocalUnits] = useState<DBStorageUnit[]>([])
   const [localSubUnits, setLocalSubUnits] = useState<DBStorageUnit[]>([])
+  const [selectedSubUnit, setSelectedSubUnit] = useState<DBStorageUnit | null>(null)
   const [unsavedChanges, setUnsavedChanges] = useState(false)
   
   // New/Edit Room State
   const [isAddingRoom, setIsAddingRoom] = useState(false)
   const [isEditingRoom, setIsEditingRoom] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
-  const [viewMode, setViewMode] = useState<'GRID' | 'ELEVATION'>('GRID')
+  const [viewMode, setViewMode] = useState<'GRID' | 'ELEVATION' | 'LOCKER_DETAILS'>('GRID')
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null)
   const [unitToDelete, setUnitToDelete] = useState<{id: string, type: 'unit' | 'locker'} | null>(null)
   const [newRoomGridWidth, setNewRoomGridWidth] = useState(50)
   const [newRoomGridHeight, setNewRoomGridHeight] = useState(50)
+  const [showControls, setShowControls] = useState(true)
+  const [isDepositing, setIsDepositing] = useState(false)
+  const [depositData, setDepositData] = useState({ title: '', client: '', thickness: '' })
+  const [checklist, setChecklist] = useState<string[]>([])
 
   // Fetch Rooms
   const { data: rooms } = useQuery({
@@ -84,6 +91,32 @@ export default function ArchitectPage() {
     }, 0)
     return () => clearTimeout(timer)
   }, [subUnits])
+
+  const handleEnterCabinet = useCallback(() => {
+    if (!selectedUnit) return;
+    setSelectedSubUnit(null); // Clear sub-unit selection when entering
+    setViewMode('ELEVATION');
+  }, [selectedUnit]);
+
+  // Handle Double Click from Canvas
+  useEffect(() => {
+    const handleDblClick = () => {
+      if (viewMode === 'GRID') {
+        handleEnterCabinet();
+      } else if (viewMode === 'ELEVATION') {
+        setViewMode('LOCKER_DETAILS');
+      }
+    };
+    window.addEventListener('canvas-dblclick', handleDblClick);
+    return () => window.removeEventListener('canvas-dblclick', handleDblClick);
+  }, [viewMode, handleEnterCabinet]);
+
+  // Fetch reports for selected locker
+  const { data: reports } = useQuery({
+    queryKey: ["reports", selectedSubUnit?.id],
+    queryFn: () => getReportsByUnitAction(selectedSubUnit!.id),
+    enabled: !!selectedSubUnit && viewMode === 'LOCKER_DETAILS'
+  })
 
   // Mutations
   const batchUpdateMutation = useMutation({
@@ -139,8 +172,17 @@ export default function ArchitectPage() {
   })
 
   const deleteUnitMutation = useMutation({
-    mutationFn: (id: string) => deleteStorageUnitAction(id),
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      // If it's a temporary ID, we don't need to call the server
+      if (id.startsWith('temp-')) return;
+      await deleteStorageUnitAction(id);
+    },
+    onSuccess: (_, id) => {
+      // 1. Remove from local states
+      setLocalUnits(prev => prev.filter(u => u.id !== id));
+      setLocalSubUnits(prev => prev.filter(u => u.id !== id));
+      
+      // 2. Invalidate queries for DB items
       queryClient.invalidateQueries({ queryKey: ["units", selectedRoomId] })
       if (selectedUnit) {
         queryClient.invalidateQueries({ queryKey: ["sub-units", selectedUnit.id] })
@@ -150,13 +192,43 @@ export default function ArchitectPage() {
         setSelectedUnit(null)
         toast.success("Unit deleted successfully")
       } else {
+        setSelectedSubUnit(null)
         toast.success("Locker deleted successfully")
       }
+      setUnitToDelete(null)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete: ${error.message}`)
       setUnitToDelete(null)
     }
   })
 
 
+  const depositMutation = useMutation({
+    mutationFn: async () => {
+      const user = session?.user as { id: string }
+      if (!user || !selectedSubUnit) throw new Error("Unauthorized or no locker selected")
+
+      return requestDepositAction({
+        title: depositData.title,
+        client: depositData.client,
+        unit_id: selectedSubUnit.id,
+        created_by: user.id,
+        metadata: {
+          thickness_cm: depositData.thickness,
+          sop_checklist: checklist
+        }
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports", selectedSubUnit?.id] })
+      toast.success("Deposit request submitted!")
+      setIsDepositing(false)
+      setDepositData({ title: '', client: '', thickness: '' })
+      setChecklist([])
+    },
+    onError: (err: Error) => toast.error(err.message)
+  })
 
   const handleEditRoom = () => {
     if (newRoomGridWidth > 200 || newRoomGridHeight > 200) return toast.error("Maximum grid size is 200px")
@@ -237,6 +309,27 @@ export default function ArchitectPage() {
     }
   }
 
+  const handleSubUnitMove = (id: string, x: number, y: number) => {
+    setLocalSubUnits(prev => prev.map(u => u.id === id ? { ...u, x, y } : u))
+    setUnsavedChanges(true)
+  }
+
+  const handleSubUnitResize = (id: string, width: number, height: number) => {
+    setLocalSubUnits(prev => prev.map(u => u.id === id ? { ...u, width, height } : u))
+    setUnsavedChanges(true)
+    if (selectedSubUnit?.id === id) {
+      setSelectedSubUnit(prev => prev ? { ...prev, width, height } : null)
+    }
+  }
+
+  const handleSubUnitRename = (id: string, name: string) => {
+    setLocalSubUnits(prev => prev.map(u => u.id === id ? { ...u, name } : u))
+    setUnsavedChanges(true)
+    if (selectedSubUnit?.id === id) {
+      setSelectedSubUnit(prev => prev ? { ...prev, name } : null)
+    }
+  }
+
   const handleSaveLayout = async () => {
     // Separate into updates and creations
     const toUpdate = localUnits.filter(u => !u.id.startsWith('temp-')).map(u => ({ 
@@ -248,12 +341,25 @@ export default function ArchitectPage() {
       name: u.name 
     }))
 
+    const subUnitsToUpdate = localSubUnits.filter(u => !u.id.startsWith('temp-')).map(u => ({
+      id: u.id,
+      x: u.x,
+      y: u.y,
+      width: Number(u.width),
+      height: Number(u.height),
+      name: u.name
+    }))
+
     const toCreate = localUnits.filter(u => u.id.startsWith('temp-'))
     const lockersToCreate = localSubUnits.filter(u => u.id.startsWith('temp-'))
 
     try {
       if (toUpdate.length > 0) {
         await batchUpdateMutation.mutateAsync(toUpdate)
+      }
+
+      if (subUnitsToUpdate.length > 0) {
+        await batchUpdateMutation.mutateAsync(subUnitsToUpdate)
       }
 
       // Create Units
@@ -329,10 +435,6 @@ export default function ArchitectPage() {
     setUnsavedChanges(true)
   }
 
-  const handleEnterCabinet = () => {
-    if (!selectedUnit) return;
-    setViewMode('ELEVATION');
-  }
 
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-180px)]">
@@ -459,50 +561,227 @@ export default function ArchitectPage() {
                   readOnly={isLocked}
                 />
               </motion.div>
-            ) : (
+            ) : viewMode === 'ELEVATION' ? (
               <motion.div 
                 key="elevation"
                 initial={{ opacity: 0, x: 100 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -100 }}
-                className="w-full h-full"
+                className="w-full h-full relative"
               >
-                <CabinetFrontView 
-                  stack={selectedUnit ? [{ 
-                    ...selectedUnit, 
-                    type: 'BOX',
-                    parentId: selectedUnit.parent_id,
-                    path: selectedUnit.id,
-                    children: localSubUnits?.map(s => ({
-                      ...s,
-                      type: 'BOX',
-                      parentId: s.parent_id,
-                      path: s.id
-                    })) as UIStorageUnit[]
-                  } as UIStorageUnit] : []} 
-                  onLockerClick={() => {}}
-                  onBack={() => setViewMode('GRID')}
-                />
-                
-                {/* Elevation Controls */}
-                <div className="absolute top-6 right-6 z-50 flex flex-col items-end gap-2">
-                   <button 
-                     onClick={handleAddLocker}
-                     className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
-                   >
-                     <Plus className="w-4 h-4" />
-                     Add Locker to {selectedUnit?.name}
-                   </button>
-                   {selectedUnit?.id.startsWith('temp-') && (
-                     <div className="bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg">
-                       <p className="text-[9px] text-amber-500 font-bold uppercase tracking-wider">Save layout first to persist lockers</p>
-                     </div>
-                   )}
+                <div className="absolute top-0 left-0 right-0 bottom-0 bg-slate-950/40 rounded-xl overflow-hidden">
+                  <ArchitectCanvas 
+                    units={localSubUnits} 
+                    selectedUnitId={selectedSubUnit?.id}
+                    onUnitSelect={setSelectedSubUnit} 
+                    onUnitMove={handleSubUnitMove}
+                    onUnitResize={handleSubUnitResize}
+                    gridWidth={25} // Smaller grid for internal cabinet
+                    gridHeight={25}
+                    readOnly={isLocked}
+                    backgroundLabel={`INSIDE: ${selectedUnit?.name}`}
+                  />
                 </div>
+
+                {/* Elevation Navigation & Actions */}
+                <AnimatePresence>
+                  {showControls && (
+                    <>
+                      <motion.div 
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="absolute top-6 left-6 z-50 flex items-center gap-4"
+                      >
+                         <button 
+                           onClick={() => setViewMode('GRID')}
+                           className="bg-white/10 backdrop-blur-md text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 hover:bg-white/20 transition-all border border-white/10"
+                         >
+                           <span className="material-symbols-outlined text-sm">arrow_back</span>
+                           Back to Room View
+                         </button>
+                      </motion.div>
+
+                      <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="absolute top-6 right-20 z-50 flex flex-col items-end gap-2"
+                      >
+                         <button 
+                           onClick={handleAddLocker}
+                           className="primary-gradient text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
+                         >
+                           <Plus className="w-4 h-4" />
+                           Add Locker to {selectedUnit?.name}
+                         </button>
+                         {unsavedChanges && (
+                            <div className="bg-amber-500/20 border border-amber-500/30 px-4 py-2 rounded-xl backdrop-blur-md">
+                              <p className="text-[10px] text-amber-400 font-black uppercase tracking-widest">Unsaved changes in cabinet</p>
+                            </div>
+                         )}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+
+                {/* Toggle Visibility Button */}
+                <button 
+                  onClick={() => setShowControls(!showControls)}
+                  className={`absolute top-6 right-6 z-50 w-12 h-12 rounded-2xl backdrop-blur-md flex items-center justify-center transition-all border shadow-2xl ${
+                    showControls 
+                      ? "bg-white/10 text-white border-white/10 hover:bg-white/20" 
+                      : "bg-primary text-white border-primary shadow-primary/20 hover:scale-110"
+                  }`}
+                  title={showControls ? "Hide Controls" : "Show Controls"}
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showControls ? "visibility" : "visibility_off"}
+                  </span>
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="locker-details"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full h-full p-8 bg-slate-900/50 rounded-xl border border-slate-800 flex flex-col gap-6"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setViewMode('ELEVATION')}
+                      className="p-3 bg-slate-800 text-white rounded-xl border border-slate-700 hover:bg-slate-700 transition-all flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-sm">arrow_back</span>
+                      Back to Elevation
+                    </button>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">{selectedSubUnit?.name}</h2>
+                      <p className="text-xs text-slate-500">Managing reports in this locker slot</p>
+                    </div>
+                  </div>
+                </div>
+
+                <LockerView 
+                  unitName={selectedSubUnit?.name || ""}
+                  reports={(reports || []) as Parameters<typeof LockerView>[0]['reports']}
+                  onDeposit={() => setIsDepositing(true)}
+                />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        {/* Deposit Modal */}
+        <AnimatePresence>
+          {isDepositing && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsDepositing(false)}
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-xl bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+              >
+                <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
+                  <div>
+                    <h2 className="text-xl font-bold text-white uppercase tracking-wider">Taro Laporan Baru</h2>
+                    <p className="text-xs text-slate-500 mt-1">Loker Target: <span className="text-blue-400 font-bold">{selectedSubUnit?.name}</span></p>
+                  </div>
+                  <button onClick={() => setIsDepositing(false)} className="w-10 h-10 rounded-xl hover:bg-white/5 text-slate-500 transition-all">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <div className="p-8 flex flex-col gap-8 overflow-y-auto max-h-[70vh]">
+                  {/* Metadata */}
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Judul Laporan</label>
+                      <input 
+                        type="text" 
+                        value={depositData.title}
+                        onChange={e => setDepositData({...depositData, title: e.target.value})}
+                        placeholder="Masukkan judul laporan..."
+                        className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Klien / Proyek</label>
+                        <input 
+                          type="text" 
+                          value={depositData.client}
+                          onChange={e => setDepositData({...depositData, client: e.target.value})}
+                          placeholder="Nama klien..."
+                          className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Ketebalan (cm)</label>
+                        <input 
+                          type="number" 
+                          value={depositData.thickness}
+                          onChange={e => setDepositData({...depositData, thickness: e.target.value})}
+                          placeholder="Contoh: 5"
+                          className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Checklist */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">SOP Verification</h3>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {["Halaman Lengkap", "Tanda Tangan & Cap", "Standard Cover", "Kondisi Fisik Baik"].map(item => (
+                        <label key={item} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                          checklist.includes(item) ? "bg-blue-500/10 border-blue-500/20 text-blue-300" : "bg-slate-800/30 border-white/5 text-slate-500 hover:bg-white/5"
+                        }`}>
+                          <input 
+                            type="checkbox" 
+                            className="hidden"
+                            checked={checklist.includes(item)}
+                            onChange={() => setChecklist(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])}
+                          />
+                          <span className="material-symbols-outlined text-sm">{checklist.includes(item) ? 'check_circle' : 'radio_button_unchecked'}</span>
+                          <span className="text-sm font-medium">{item}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-8 bg-white/5 border-t border-white/5 flex gap-3">
+                  <button 
+                    onClick={() => setIsDepositing(false)}
+                    className="flex-1 py-4 rounded-2xl bg-slate-800 text-slate-400 text-xs font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={() => depositMutation.mutate()}
+                    disabled={depositMutation.isPending || checklist.length < 4 || !depositData.title}
+                    className="flex-1 py-4 rounded-2xl primary-gradient text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                  >
+                    {depositMutation.isPending ? "Memproses..." : "Taro Laporan Sekarang"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Sidebar Info */}
         <motion.div 
@@ -526,19 +805,40 @@ export default function ArchitectPage() {
             )}
           </div>
 
-          {selectedUnit ? (
+          {selectedUnit || selectedSubUnit ? (
             <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                <div className="flex items-center gap-3">
+                   <Box className="w-4 h-4 text-blue-500" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">
+                     {selectedSubUnit ? 'Locker Properties' : 'Cabinet Properties'}
+                   </span>
+                </div>
+                <button 
+                  onClick={() => setUnitToDelete({ 
+                    id: (selectedSubUnit?.id || selectedUnit?.id)!, 
+                    type: selectedSubUnit ? 'locker' : 'unit' 
+                  })}
+                  className="p-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-all"
+                >
+                   <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Unit Name</label>
+                <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Name</label>
                 <input 
                   type="text" 
-                  value={selectedUnit.name}
-                  onChange={(e) => handleUnitRename(selectedUnit.id, e.target.value)}
+                  value={selectedSubUnit ? selectedSubUnit.name : (selectedUnit?.name || '')}
+                  onChange={(e) => {
+                    if (selectedSubUnit) handleSubUnitRename(selectedSubUnit.id, e.target.value)
+                    else if (selectedUnit) handleUnitRename(selectedUnit.id, e.target.value)
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
 
-              {viewMode === 'GRID' && (
+              {viewMode === 'GRID' && selectedUnit && (
                 <button 
                   onClick={handleEnterCabinet}
                   className="w-full py-4 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] border border-slate-700 hover:bg-slate-700 transition-all flex items-center justify-center gap-3 group"
@@ -548,17 +848,27 @@ export default function ArchitectPage() {
                 </button>
               )}
 
+              {viewMode === 'ELEVATION' && selectedSubUnit && (
+                <button 
+                  onClick={() => setViewMode('LOCKER_DETAILS')}
+                  className="w-full py-4 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group"
+                >
+                  <span className="material-symbols-outlined text-sm group-hover:scale-110 transition-transform">inventory_2</span>
+                  Open Locker Details
+                </button>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">X Position</label>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 font-mono">
-                    {selectedUnit.x}
+                    {selectedSubUnit ? selectedSubUnit.x : (selectedUnit?.x || 0)}
                   </div>
                 </div>
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Y Position</label>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 font-mono">
-                    {selectedUnit.y}
+                    {selectedSubUnit ? selectedSubUnit.y : (selectedUnit?.y || 0)}
                   </div>
                 </div>
               </div>
@@ -567,22 +877,28 @@ export default function ArchitectPage() {
                   <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Width (px)</label>
                   <input 
                     type="number" 
-                    step={50}
-                    disabled={viewMode === 'ELEVATION'}
-                    value={selectedUnit.width || 100}
-                    onChange={(e) => handleUnitResize(selectedUnit.id, parseInt(e.target.value) || 0, selectedUnit.height || 100)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono disabled:opacity-50"
+                    step={25}
+                    value={(selectedSubUnit ? selectedSubUnit.width : selectedUnit?.width) || 100}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      if (selectedSubUnit) handleSubUnitResize(selectedSubUnit.id, val, selectedSubUnit.height)
+                      else if (selectedUnit) handleUnitResize(selectedUnit.id, val, selectedUnit.height)
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Height (px)</label>
                   <input 
                     type="number" 
-                    step={50}
-                    disabled={viewMode === 'ELEVATION'}
-                    value={selectedUnit.height || 100}
-                    onChange={(e) => handleUnitResize(selectedUnit.id, selectedUnit.width || 100, parseInt(e.target.value) || 0)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono disabled:opacity-50"
+                    step={25}
+                    value={(selectedSubUnit ? selectedSubUnit.height : selectedUnit?.height) || 100}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      if (selectedSubUnit) handleSubUnitResize(selectedSubUnit.id, selectedSubUnit.width, val)
+                      else if (selectedUnit) handleUnitResize(selectedUnit.id, selectedUnit.width, val)
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
               </div>
@@ -621,13 +937,25 @@ export default function ArchitectPage() {
                           }`}>
                             {locker.status}
                           </span>
-                          <button 
-                            onClick={() => setUnitToDelete({ id: locker.id, type: 'locker' })}
-                            className="p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-md transition-colors"
-                            title="Delete Locker"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => {
+                                setSelectedSubUnit(locker);
+                                setViewMode('LOCKER_DETAILS');
+                              }}
+                              className="p-1 hover:bg-blue-500/10 text-slate-500 hover:text-blue-400 rounded-md transition-colors"
+                              title="View Reports"
+                            >
+                              <LogIn className="w-3 h-3" />
+                            </button>
+                            <button 
+                              onClick={() => setUnitToDelete({ id: locker.id, type: 'locker' })}
+                              className="p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-md transition-colors"
+                              title="Delete Locker"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))

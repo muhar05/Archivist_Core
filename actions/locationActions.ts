@@ -55,3 +55,7 @@ export async function getUnitHierarchyAction(unitId: string) {
 export async function setRoomMaintenanceAction(roomId: string, isMaintenance: boolean) {
   return await locationService.setRoomMaintenance(roomId, isMaintenance);
 }
+
+export async function getAssignableUnitsAction() {
+  return await locationService.getAssignableUnits();
+}

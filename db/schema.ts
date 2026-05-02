@@ -47,7 +47,7 @@ export const storageUnits = pgTable("storage_units", {
     columns: [table.parent_id],
     foreignColumns: [table.id],
     name: "storage_units_parent_id_fkey"
-  })
+  }).onDelete("cascade")
 }));
 
 
