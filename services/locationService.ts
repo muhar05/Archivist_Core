@@ -38,7 +38,10 @@ export const locationService = {
 
   async getStorageUnits(room_id: string) {
     return await db.query.storageUnits.findMany({
-      where: eq(storageUnits.room_id, room_id)
+      where: (table, { and, eq, isNull }) => and(
+        eq(table.room_id, room_id),
+        isNull(table.parent_id)
+      )
     });
   },
 

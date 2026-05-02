@@ -80,13 +80,6 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             </div>
           )}
         </nav>
-        
-        <div className="mt-auto pb-4">
-          <button className="w-full primary-gradient text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-all scale-100 active:scale-[0.98]">
-            <span className="material-symbols-outlined text-sm">add</span>
-            New Record
-          </button>
-        </div>
       </div>
     </div>
   )

@@ -54,9 +54,12 @@ export const storageUnits = pgTable("storage_units", {
 // Reports
 export const reports = pgTable("reports", {
   id: uuid("id").primaryKey().defaultRandom(),
-  unit_id: uuid("unit_id").references(() => storageUnits.id).notNull(),
+  unit_id: uuid("unit_id").references(() => storageUnits.id, { onDelete: "cascade" }).notNull(),
+  report_number: text("report_number").notNull(), // Nomor Laporan
+  report_date: timestamp("report_date").defaultNow().notNull(), // Tanggal Laporan
   title: text("title").notNull(),
   client: text("client"),
+  description: text("description"), // Keterangan
   metadata: jsonb("metadata").default({}).notNull(),
   status: text("status").$type<"pending" | "archived" | "loaned">().default("pending").notNull(),
   created_by: uuid("created_by").references(() => profiles.id).notNull(),
@@ -85,6 +88,14 @@ export const loans = pgTable("loans", {
   return_date: timestamp("return_date"),
   status: text("status").$type<"ONGOING" | "RETURNED" | "OVERDUE">().default("ONGOING").notNull(),
   notes: text("notes"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+// SOP Requirements
+export const sopRequirements = pgTable("sop_requirements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(), // Nama Dokumen / Persyaratan
+  description: text("description"),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
