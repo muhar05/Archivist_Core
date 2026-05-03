@@ -90,7 +90,11 @@ export const LockerView: React.FC<LockerViewProps> = ({
                         </div>
                         <div>
                           <div className="font-bold text-white text-sm group-hover:text-blue-400 transition-colors">{report.title}</div>
-                          <div className="text-[10px] text-slate-500 font-mono mt-0.5 tracking-tighter">ID: {report.id}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <div className="text-[10px] text-slate-500 font-mono tracking-tighter">ID: {report.id}</div>
+                            <div className="w-1 h-1 rounded-full bg-slate-700" />
+                            <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">#{report.report_number}</div>
+                          </div>
                         </div>
                       </div>
                     </td>

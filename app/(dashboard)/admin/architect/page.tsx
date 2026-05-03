@@ -47,7 +47,7 @@ export default function ArchitectPage() {
   const [newRoomGridHeight, setNewRoomGridHeight] = useState(50)
   const [showControls, setShowControls] = useState(true)
   const [isDepositing, setIsDepositing] = useState(false)
-  const [depositData, setDepositData] = useState({ title: '', client: '', thickness: '' })
+  const [depositData, setDepositData] = useState({ report_number: '', title: '', client: '', thickness: '' })
   const [checklist, setChecklist] = useState<string[]>([])
   const [newSOPName, setNewSOPName] = useState('')
   const [activeTab, setActiveTab] = useState<'PROPERTIES' | 'SOP'>('PROPERTIES')
@@ -236,6 +236,7 @@ export default function ArchitectPage() {
       if (!user || !selectedSubUnit) throw new Error("Unauthorized or no locker selected")
 
       return requestDepositAction({
+        report_number: depositData.report_number,
         title: depositData.title,
         client: depositData.client,
         unit_id: selectedSubUnit.id,
@@ -250,7 +251,7 @@ export default function ArchitectPage() {
       queryClient.invalidateQueries({ queryKey: ["reports", selectedSubUnit?.id] })
       toast.success("Deposit request submitted!")
       setIsDepositing(false)
-      setDepositData({ title: '', client: '', thickness: '' })
+      setDepositData({ report_number: '', title: '', client: '', thickness: '' })
       setChecklist([])
     },
     onError: (err: Error) => toast.error(err.message)
@@ -789,25 +790,38 @@ export default function ArchitectPage() {
                 </div>
 
                 <div className="p-8 flex flex-col gap-8 overflow-y-auto max-h-[70vh]">
-                  {/* Metadata */}
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Judul Laporan</label>
-                      <input 
-                        type="text" 
-                        value={depositData.title}
-                        onChange={e => setDepositData({...depositData, title: e.target.value})}
-                        placeholder="Masukkan judul laporan..."
-                        className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
-                      />
+                  {/* Metadata Section */}
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Nomor Laporan</label>
+                        <input 
+                          type="text" 
+                          value={depositData.report_number}
+                          onChange={e => setDepositData(prev => ({...prev, report_number: e.target.value}))}
+                          placeholder="e.g. REP-2024-001"
+                          className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 col-span-2">
+                        <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Judul Laporan</label>
+                        <input 
+                          type="text" 
+                          value={depositData.title}
+                          onChange={e => setDepositData(prev => ({...prev, title: e.target.value}))}
+                          placeholder="Masukkan judul laporan..."
+                          className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
+                        />
+                      </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex flex-col gap-2">
                         <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Klien / Proyek</label>
                         <input 
                           type="text" 
                           value={depositData.client}
-                          onChange={e => setDepositData({...depositData, client: e.target.value})}
+                          onChange={e => setDepositData(prev => ({...prev, client: e.target.value}))}
                           placeholder="Nama klien..."
                           className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
                         />
@@ -817,7 +831,7 @@ export default function ArchitectPage() {
                         <input 
                           type="number" 
                           value={depositData.thickness}
-                          onChange={e => setDepositData({...depositData, thickness: e.target.value})}
+                          onChange={e => setDepositData(prev => ({...prev, thickness: e.target.value}))}
                           placeholder="Contoh: 5"
                           className="bg-slate-800/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
                         />
@@ -825,7 +839,7 @@ export default function ArchitectPage() {
                     </div>
                   </div>
 
-                  {/* Checklist */}
+                  {/* SOP Section */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <div className="w-1 h-4 bg-amber-500 rounded-full" />
@@ -847,7 +861,7 @@ export default function ArchitectPage() {
                         </label>
                       ))}
                       {(sopRequirements || []).length === 0 && (
-                        <p className="text-center text-xs text-slate-600 italic py-4">No SOP requirements defined. Please add some in the sidebar.</p>
+                        <p className="text-center text-xs text-slate-600 italic py-4">No SOP requirements defined.</p>
                       )}
                     </div>
                   </div>
@@ -862,7 +876,7 @@ export default function ArchitectPage() {
                   </button>
                   <button 
                     onClick={() => depositMutation.mutate()}
-                    disabled={depositMutation.isPending || (checklist.length < (sopRequirements?.length || 0)) || !depositData.title || (sopRequirements?.length === 0)}
+                    disabled={depositMutation.isPending || (checklist.length < (sopRequirements?.length || 0)) || !depositData.title || !depositData.report_number || (sopRequirements?.length === 0)}
                     className="flex-1 py-4 rounded-2xl primary-gradient text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale"
                   >
                     {depositMutation.isPending ? "Memproses..." : "Taro Laporan Sekarang"}
@@ -916,8 +930,8 @@ export default function ArchitectPage() {
                         type="text" 
                         value={selectedSubUnit ? selectedSubUnit.name : (selectedUnit?.name || '')}
                         onChange={(e) => {
-                          if (selectedSubUnit) handleSubUnitRename(selectedSubUnit.id, e.target.value)
-                          else if (selectedUnit) handleUnitRename(selectedUnit.id, e.target.value)
+                          if (selectedSubUnit) handleSubUnitRename(selectedSubUnit!.id, e.target.value)
+                          else if (selectedUnit) handleUnitRename(selectedUnit!.id, e.target.value)
                         }}
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
                       />
@@ -966,8 +980,8 @@ export default function ArchitectPage() {
                           value={(selectedSubUnit ? selectedSubUnit.width : selectedUnit?.width) || 100}
                           onChange={(e) => {
                             const val = parseInt(e.target.value) || 0;
-                            if (selectedSubUnit) handleSubUnitResize(selectedSubUnit.id, val, selectedSubUnit.height)
-                            else if (selectedUnit) handleUnitResize(selectedUnit.id, val, selectedUnit.height)
+                            if (selectedSubUnit) handleSubUnitResize(selectedSubUnit!.id, val, selectedSubUnit!.height)
+                            else if (selectedUnit) handleUnitResize(selectedUnit!.id, val, selectedUnit!.height)
                           }}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
                         />
@@ -980,8 +994,8 @@ export default function ArchitectPage() {
                           value={(selectedSubUnit ? selectedSubUnit.height : selectedUnit?.height) || 100}
                           onChange={(e) => {
                             const val = parseInt(e.target.value) || 0;
-                            if (selectedSubUnit) handleSubUnitResize(selectedSubUnit.id, selectedSubUnit.width, val)
-                            else if (selectedUnit) handleUnitResize(selectedUnit.id, selectedUnit.width, val)
+                            if (selectedSubUnit) handleSubUnitResize(selectedSubUnit!.id, selectedSubUnit!.width, val)
+                            else if (selectedUnit) handleUnitResize(selectedUnit!.id, selectedUnit!.width, val)
                           }}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
                         />

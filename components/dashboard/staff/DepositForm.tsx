@@ -16,6 +16,7 @@ const SOP_CHECKLIST = [
 ]
 
 interface DepositFormData {
+  report_number: string;
   title: string;
   client: string;
   unit_id: string;
@@ -26,6 +27,7 @@ export const DepositForm = () => {
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const [formData, setFormData] = useState<DepositFormData>({
+    report_number: "",
     title: "",
     client: "",
     unit_id: "",
@@ -45,6 +47,7 @@ export const DepositForm = () => {
       if (!user) throw new Error("Unauthorized")
 
       return reportService.requestDeposit({
+        report_number: data.report_number,
         title: data.title,
         client: data.client,
         unit_id: data.unit_id,
@@ -58,7 +61,7 @@ export const DepositForm = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] })
       toast.success("Deposit request submitted successfully!")
-      setFormData({ title: "", client: "", unit_id: "", thickness: "" })
+      setFormData({ report_number: "", title: "", client: "", unit_id: "", thickness: "" })
       setChecklist([])
     },
     onError: (error: Error) => {
@@ -89,8 +92,18 @@ export const DepositForm = () => {
           <h3 className="text-sm font-bold uppercase tracking-widest">Report Metadata</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase">Report Number</label>
+            <input 
+              required
+              value={formData.report_number}
+              onChange={e => setFormData({...formData, report_number: e.target.value})}
+              placeholder="e.g. REP-2024-001"
+              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-xs font-bold text-slate-500 uppercase">Report Title</label>
             <input 
               required
@@ -100,6 +113,9 @@ export const DepositForm = () => {
               className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase">Client / Project</label>
             <input 
@@ -109,23 +125,6 @@ export const DepositForm = () => {
               placeholder="e.g. PT. Global Solusi"
               className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
             />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase">Target Locker</label>
-            <select 
-              required
-              value={formData.unit_id}
-              onChange={e => setFormData({...formData, unit_id: e.target.value})}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
-            >
-              <option value="" disabled>Select a locker</option>
-              {units?.map(u => (
-                <option key={u.id} value={u.id}>{u.name} (Status: {u.status})</option>
-              ))}
-            </select>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase">Estimated Thickness (cm)</label>
@@ -138,6 +137,21 @@ export const DepositForm = () => {
               className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
             />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase">Target Locker</label>
+          <select 
+            required
+            value={formData.unit_id}
+            onChange={e => setFormData({...formData, unit_id: e.target.value})}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
+          >
+            <option value="" disabled>Select a locker</option>
+            {units?.map(u => (
+              <option key={u.id} value={u.id}>{u.name} (Status: {u.status})</option>
+            ))}
+          </select>
         </div>
       </div>
 
