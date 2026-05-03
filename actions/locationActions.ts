@@ -6,11 +6,11 @@ export async function getRoomsAction() {
   return await locationService.getRooms();
 }
 
-export async function createRoomAction(room: { name: string; floor_number: number; grid_width?: number; grid_height?: number }) {
+export async function createRoomAction(room: { name: string; floor_number: number; grid_width?: number; grid_height?: number; ceiling_height_cm?: number; width_cm?: number; height_cm?: number }) {
   return await locationService.createRoom(room);
 }
 
-export async function updateRoomAction(id: string, updates: Partial<{ name: string; floor_number: number; grid_width: number; grid_height: number; is_maintenance: boolean }>) {
+export async function updateRoomAction(id: string, updates: Partial<{ name: string; floor_number: number; grid_width: number; grid_height: number; width_cm: number; height_cm: number; ceiling_height_cm: number; is_maintenance: boolean }>) {
   return await locationService.updateRoom(id, updates);
 }
 

@@ -71,7 +71,7 @@ export const reportService = {
     // 1. Update status
     const [updatedReport] = await db
       .update(reports)
-      .set({ status: "archived" })
+      .set({ status: "pending_placement" })
       .where(eq(reports.id, report_id))
       .returning();
 
@@ -80,7 +80,7 @@ export const reportService = {
       report_id: report_id,
       action: "VERIFICATION",
       from_user_id: admin_id,
-      notes: "Physical verification completed and archived by Admin"
+      notes: "Physical verification completed. Awaiting staff placement confirmation."
     });
 
     return updatedReport;
@@ -96,6 +96,40 @@ export const reportService = {
       with: {
         unit: true,
         creator: true
+      }
+    });
+  },
+  async confirmPlacement(report_id: string, staff_id: string) {
+    // 1. Update status to archived
+    const [updatedReport] = await db
+      .update(reports)
+      .set({ 
+        status: "archived",
+        placement_confirmed_at: new Date(),
+        placement_confirmed_by: staff_id
+      })
+      .where(eq(reports.id, report_id))
+      .returning();
+
+    // 2. Create Log
+    await db.insert(reportLogs).values({
+      report_id: report_id,
+      action: "PLACEMENT_CONFIRMATION",
+      from_user_id: staff_id,
+      notes: "Staff confirmed physical placement in the designated locker slot."
+    });
+
+    return updatedReport;
+  },
+
+  async getReportsByStaff(staff_id: string) {
+    return await db.query.reports.findMany({
+      where: eq(reports.created_by, staff_id),
+      orderBy: [desc(reports.created_at)],
+      with: {
+        unit: {
+          with: { room: true }
+        }
       }
     });
   }

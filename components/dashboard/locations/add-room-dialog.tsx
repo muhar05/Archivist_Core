@@ -7,7 +7,7 @@ import { X, Layout, Maximize2 } from "lucide-react"
 interface AddRoomDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (config: { name: string; floor_number: number; grid_width: number; grid_height: number }) => void;
+  onAdd: (config: { name: string; floor_number: number; grid_width: number; grid_height: number; ceiling_height_cm: number; width_cm: number; height_cm: number }) => void;
 }
 
 export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
@@ -15,12 +15,23 @@ export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
   const [floorNumber, setFloorNumber] = useState(1)
   const [gridWidth, setGridWidth] = useState(50)
   const [gridHeight, setGridHeight] = useState(50)
+  const [roomWidth, setRoomWidth] = useState(1500)
+  const [roomHeight, setRoomHeight] = useState(1000)
+  const [ceilingHeight, setCeilingHeight] = useState(300) // cm
 
   if (!isOpen) return null;
 
   const handleSubmit = () => {
     if (!name) return;
-    onAdd({ name, floor_number: floorNumber, grid_width: gridWidth, grid_height: gridHeight });
+    onAdd({ 
+      name, 
+      floor_number: floorNumber, 
+      grid_width: gridWidth, 
+      grid_height: gridHeight,
+      ceiling_height_cm: ceilingHeight,
+      width_cm: roomWidth,
+      height_cm: roomHeight
+    });
     onClose();
   };
 
@@ -75,7 +86,7 @@ export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
                 />
               </div>
 
-              <div className="space-y-3 col-span-2">
+              <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1 flex items-center gap-2">
                   <span className="material-symbols-outlined text-xs text-primary">layers</span> Floor Number
                 </label>
@@ -86,6 +97,48 @@ export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
                   className="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary/20 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
                 />
               </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-1 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-xs text-primary">vertical_align_top</span> Ceiling Height (cm)
+                </label>
+                <input 
+                  type="number"
+                  value={ceilingHeight}
+                  onChange={(e) => setCeilingHeight(Number(e.target.value))}
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary/20 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-white transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Room Dimensions */}
+            <div className="p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10">
+               <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Layout className="w-4 h-4 text-blue-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Room Size (cm)</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-blue-400 font-bold">{(roomWidth/100).toFixed(1)}m × {(roomHeight/100).toFixed(1)}m</span>
+               </div>
+               
+               <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Total Width</span>
+                    <input 
+                      type="number"
+                      value={roomWidth} onChange={(e) => setRoomWidth(Number(e.target.value))}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Total Depth</span>
+                    <input 
+                      type="number"
+                      value={roomHeight} onChange={(e) => setRoomHeight(Number(e.target.value))}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-blue-500 transition-all"
+                    />
+                  </div>
+               </div>
             </div>
 
             {/* Grid Configuration */}
@@ -95,22 +148,22 @@ export function AddRoomDialog({ isOpen, onClose, onAdd }: AddRoomDialogProps) {
                     <Maximize2 className="w-4 h-4 text-primary" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Grid Precision</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">{gridWidth}px × {gridHeight}px</span>
+                  <span className="text-[10px] font-mono text-slate-400">{gridWidth}cm × {gridHeight}cm</span>
                </div>
                
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Grid Width</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Grid Width (cm)</span>
                     <input 
-                      type="range" min="10" max="200" step="10"
+                      type="range" min="10" max="100" step="10"
                       value={gridWidth} onChange={(e) => setGridWidth(Number(e.target.value))}
                       className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
                   <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Grid Height</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Grid Height (cm)</span>
                     <input 
-                      type="range" min="10" max="200" step="10"
+                      type="range" min="10" max="100" step="10"
                       value={gridHeight} onChange={(e) => setGridHeight(Number(e.target.value))}
                       className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
                     />

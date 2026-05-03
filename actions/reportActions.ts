@@ -29,3 +29,11 @@ export async function approveReportAction(reportId: string, adminId: string) {
 export async function searchReportsAction(query: string) {
   return await reportService.searchReports(query);
 }
+
+export async function confirmPlacementAction(reportId: string, staffId: string) {
+  return await reportService.confirmPlacement(reportId, staffId);
+}
+
+export async function getReportsByStaffAction(staffId: string) {
+  return await reportService.getReportsByStaff(staffId);
+}

@@ -10,6 +10,8 @@ interface LockerViewProps {
   onDeposit?: () => void
   onLoan?: (reportId: string) => void
   onView?: (reportId: string) => void
+  currentStatus?: "available" | "low_space" | "full"
+  onStatusChange?: (status: "available" | "low_space" | "full") => void
 }
 
 export const LockerView: React.FC<LockerViewProps> = ({ 
@@ -17,7 +19,9 @@ export const LockerView: React.FC<LockerViewProps> = ({
   unitName,
   onDeposit,
   onLoan,
-  onView
+  onView,
+  currentStatus = "available",
+  onStatusChange
 }) => {
   return (
     <div className="flex flex-col gap-6">
@@ -28,6 +32,27 @@ export const LockerView: React.FC<LockerViewProps> = ({
              Records in {unitName}
           </h2>
           <p className="text-xs text-slate-500 mt-1">Total {reports.length} physical records found in this locker</p>
+          
+          <div className="flex items-center gap-3 mt-4">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Density Status (Manual):</span>
+            <div className="flex gap-2">
+              {(["available", "low_space", "full"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => onStatusChange?.(s)}
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                    currentStatus === s 
+                      ? s === 'available' ? 'bg-emerald-500 text-white border-emerald-400 shadow-lg shadow-emerald-500/20' :
+                        s === 'low_space' ? 'bg-amber-500 text-white border-amber-400 shadow-lg shadow-amber-500/20' :
+                        'bg-rose-500 text-white border-rose-400 shadow-lg shadow-rose-500/20'
+                      : 'bg-slate-800/50 text-slate-500 border-slate-700 hover:border-slate-600'
+                  }`}
+                >
+                  {s.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         
         <div className="flex gap-3">
