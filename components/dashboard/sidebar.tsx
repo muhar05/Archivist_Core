@@ -1,9 +1,8 @@
 "use client"
 
-import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { useSession, signOut } from "next-auth/react"
 import { motion, AnimatePresence } from "framer-motion"
 
 const navigation = [
@@ -80,6 +79,32 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             </div>
           )}
         </nav>
+        
+        <div className="mt-auto pt-6 pb-2 border-t border-slate-200 dark:border-slate-800/50">
+          <div className="px-4 mb-4">
+            <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <span className="material-symbols-outlined">account_circle</span>
+              </div>
+              <div className="overflow-hidden">
+                <div className="text-sm font-bold text-slate-800 dark:text-white truncate">
+                  {session?.user?.name || "User"}
+                </div>
+                <div className="text-[10px] uppercase font-black tracking-widest text-slate-500">
+                  {isAdmin ? "Administrator" : "Staff"}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => signOut({ callbackUrl: "/auth/login" })}
+            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-200 group"
+          >
+            <span className="material-symbols-outlined group-hover:rotate-12 transition-transform">logout</span>
+            <span className="font-bold">Logout</span>
+          </button>
+        </div>
       </div>
     </div>
   )

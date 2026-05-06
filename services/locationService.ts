@@ -110,12 +110,13 @@ export const locationService = {
   },
 
   async getUnitById(id: string) {
-    return await db.query.storageUnits.findFirst({
+    const res = await db.query.storageUnits.findFirst({
       where: eq(storageUnits.id, id),
       with: {
         room: true
       }
     });
+    return res || null;
   },
 
   async getSubUnits(parent_id: string) {
@@ -124,13 +125,38 @@ export const locationService = {
     });
   },
 
-  async getUnitHierarchy(unit_id: string) {
-    return await db.query.storageUnits.findFirst({
-      where: eq(storageUnits.id, unit_id),
+  async getUnitHierarchy(id: string) {
+    // 1. Try to find as a Storage Unit (Cabinet)
+    const unit = await db.query.storageUnits.findFirst({
+      where: eq(storageUnits.id, id),
       with: {
-        room: true
+        room: true,
+        parent: true
       }
     });
+
+    if (unit) return { type: "unit" as const, data: unit };
+
+    // 2. Try to find as a Locker
+    const locker = await db.query.lockers.findFirst({
+      where: eq(lockers.id, id),
+      with: {
+        cabinet: {
+          with: { room: true }
+        }
+      }
+    });
+
+    if (locker) return { type: "locker" as const, data: locker };
+
+    // 3. Try to find as a Room
+    const room = await db.query.rooms.findFirst({
+      where: eq(rooms.id, id),
+    });
+
+    if (room) return { type: "room" as const, data: room };
+
+    return null;
   },
 
   async setRoomMaintenance(room_id: string, is_maintenance: boolean) {

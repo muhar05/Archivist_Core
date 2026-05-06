@@ -1,11 +1,18 @@
 "use client"
 
 import React from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getDashboardStatsAction, getRecentActivityAction } from "@/actions/dashboardActions"
-import { motion } from "framer-motion"
+import { getReportsByStaffAction, confirmPlacementAction } from "@/actions/reportActions"
+import { motion, AnimatePresence } from "framer-motion"
+import { useSession } from "next-auth/react"
+import { toast } from "sonner"
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient()
+  const { data: session } = useSession()
+  const userId = (session?.user as { id?: string })?.id
+
   // Fetch Dashboard Stats
   const { data: stats, isLoading: isLoadingStats } = useQuery({
     queryKey: ["dashboard-stats"],
@@ -16,6 +23,24 @@ export default function DashboardPage() {
   const { data: activity, isLoading: isLoadingActivity } = useQuery({
     queryKey: ["recent-activity"],
     queryFn: () => getRecentActivityAction()
+  })
+
+  // Fetch User's Reports for Placement Confirmation
+  const { data: userReports } = useQuery({
+    queryKey: ["reports", "staff", userId],
+    queryFn: () => getReportsByStaffAction(userId!),
+    enabled: !!userId
+  })
+
+  const pendingPlacements = userReports?.filter(r => r.status === "pending_placement") || []
+
+  const confirmPlacementMutation = useMutation({
+    mutationFn: (reportId: string) => confirmPlacementAction(reportId, userId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] })
+      toast.success("Placement confirmed. Report is now ARCHIVED.")
+    }
   })
 
 
@@ -66,6 +91,42 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Tasks Needing Attention (Placement Confirmation) */}
+      <AnimatePresence>
+        {pendingPlacements.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 overflow-hidden"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <span className="material-symbols-outlined text-amber-500">priority_high</span>
+              <h3 className="text-sm font-black text-amber-500 uppercase tracking-widest">Pending Placement Confirmation</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pendingPlacements.map(report => (
+                <div key={report.id} className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-bold text-white">{report.title}</div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">
+                      Target: {report.unit?.name} ({report.unit?.room?.name})
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => confirmPlacementMutation.mutate(report.id)}
+                    disabled={confirmPlacementMutation.isPending}
+                    className="w-full py-2 bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-400 transition-colors"
+                  >
+                    Confirm Physical Placement
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-12 gap-8 font-body">

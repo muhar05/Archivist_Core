@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getPendingReportsAction, approveReportAction } from "@/actions/reportActions"
+import { getPendingReportsAction, approveReportAction, rejectReportAction } from "@/actions/reportActions"
 import { getRoomsAction, setRoomMaintenanceAction } from "@/actions/locationActions"
 import { getSOPRequirementsAction } from "@/actions/sopActions"
 import { useSession } from "next-auth/react"
@@ -13,8 +13,16 @@ interface Report {
   id: string;
   title: string;
   created_at: string | Date;
-  creator?: { full_name: string };
-  unit?: { name: string; room?: { name: string } };
+  status: string;
+  creator?: { full_name: string | null };
+  unit?: { 
+    id: string;
+    name: string; 
+    room?: { 
+      id: string;
+      name: string 
+    } | null;
+  } | null;
 }
 
 interface Room {
@@ -38,7 +46,7 @@ export default function ApprovalsPage() {
   // 1. Fetch Pending Reports
   const { data: pendingReports, isLoading: isLoadingReports } = useQuery<Report[]>({
     queryKey: ["reports", "pending"],
-    queryFn: () => getPendingReportsAction()
+    queryFn: () => getPendingReportsAction() as Promise<Report[]>
   })
 
   // 2. Fetch Rooms for Maintenance Mode
@@ -82,7 +90,20 @@ export default function ApprovalsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] })
-      toast.success("Report successfully verified and archived")
+      toast.success("Report successfully verified and moved to pending placement")
+    },
+    onError: (error: Error) => toast.error(error.message)
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ reportId, reason }: { reportId: string; reason: string }) => {
+      if (!session?.user) throw new Error("Unauthorized")
+      const userId = (session.user as { id: string }).id
+      return rejectReportAction(reportId, userId, reason)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
+      toast.success("Report request rejected")
     },
     onError: (error: Error) => toast.error(error.message)
   })
@@ -124,7 +145,7 @@ export default function ApprovalsPage() {
                 No reports waiting for verification.
               </div>
             ) : (
-              pendingReports?.map((report) => {
+              (pendingReports || []).map((report: Report) => {
                 const isReady = isAllSOPChecked(report.id)
 
                 return (
@@ -150,17 +171,30 @@ export default function ApprovalsPage() {
                           <div className="text-[10px] font-black uppercase tracking-widest text-slate-600">{report.unit?.room?.name}</div>
                         </div>
                         
-                        <button 
-                          onClick={() => approveMutation.mutate(report.id)}
-                          disabled={approveMutation.isPending || !isReady}
-                          className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
-                            isReady 
-                              ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95" 
-                              : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50"
-                          }`}
-                        >
-                          {approveMutation.isPending ? "Archiving..." : "Verify & Archive"}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => {
+                              const reason = window.prompt("Alasan penolakan:")
+                              if (reason) rejectMutation.mutate({ reportId: report.id, reason })
+                            }}
+                            disabled={rejectMutation.isPending || approveMutation.isPending}
+                            className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 transition-all"
+                          >
+                            Reject
+                          </button>
+                          
+                          <button 
+                            onClick={() => approveMutation.mutate(report.id)}
+                            disabled={approveMutation.isPending || !isReady}
+                            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                              isReady 
+                                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95" 
+                                : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50"
+                            }`}
+                          >
+                            {approveMutation.isPending ? "Approving..." : "Verify & Approve"}
+                          </button>
+                        </div>
                       </div>
                     </div>
 

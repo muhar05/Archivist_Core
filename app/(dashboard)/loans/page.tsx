@@ -41,8 +41,8 @@ export default function LoansPage() {
       recordCode: raw.report_id.split("-")[0].toUpperCase(),
       borrowerName: raw.borrower?.full_name || "Unknown Borrower",
       borrowerId: raw.borrower_id.split("-")[0].toUpperCase(),
-      loanDate: new Date(raw.loan_date).toLocaleDateString(),
-      dueDate: new Date(raw.due_date).toLocaleDateString(),
+      loanDate: new Date(raw.loan_date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+      dueDate: new Date(raw.due_date).toLocaleDateString('id-ID', { dateStyle: 'medium' }),
       returnDate: raw.return_date ? new Date(raw.return_date).toLocaleDateString() : undefined,
       status: raw.status as LoanStatus,
       notes: raw.notes || ""

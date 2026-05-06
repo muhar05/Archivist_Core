@@ -2,6 +2,7 @@
 
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useSession } from "next-auth/react"
 import { LoanSession, LoanStatus } from "../locations/types"
 
 interface AddLoanDialogProps {
@@ -11,6 +12,8 @@ interface AddLoanDialogProps {
 }
 
 export function AddLoanDialog({ isOpen, onClose, onAdd }: AddLoanDialogProps) {
+  const { data: session } = useSession();
+  const [prevOpen, setPrevOpen] = useState(isOpen);
   const [formData, setFormData] = useState({
     recordId: "",
     recordTitle: "",
@@ -21,6 +24,18 @@ export function AddLoanDialog({ isOpen, onClose, onAdd }: AddLoanDialogProps) {
     dueDate: "",
     notes: "",
   });
+
+  // Sync state when dialog opens
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen);
+    if (isOpen && session?.user) {
+      setFormData(prev => ({
+        ...prev,
+        borrowerName: session.user?.name || "",
+        borrowerId: (session.user as { id?: string }).id || "",
+      }));
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,9 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { db } from "@/db";
+import { profiles } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 const handler = NextAuth({
   providers: [
@@ -10,23 +14,27 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (credentials?.email === "admin@prms.local" && credentials?.password === "admin123") {
-          return {
-            id: "00000000-0000-0000-0000-000000000001",
-            name: "Admin Archivist",
-            email: "admin@prms.local",
-            role: "admin"
-          };
-        }
-        if (credentials?.email === "staff@prms.local" && credentials?.password === "staff123") {
-          return {
-            id: "00000000-0000-0000-0000-000000000002",
-            name: "Staff Operator",
-            email: "staff@prms.local",
-            role: "staff"
-          };
-        }
-        return null;
+        if (!credentials?.email || !credentials?.password) return null;
+
+        // 1. Find user in database
+        const user = await db.query.profiles.findFirst({
+          where: eq(profiles.email, credentials.email)
+        });
+
+        if (!user) return null;
+
+        // 2. Verify password
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+
+        if (!isValid) return null;
+
+        // 3. Return user object
+        return {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          role: user.role
+        };
       }
     })
   ],

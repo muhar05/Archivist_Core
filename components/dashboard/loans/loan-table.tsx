@@ -4,6 +4,8 @@ import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { LoanSession } from "../locations/types"
 import { LoanStatusBadge } from "./loan-status-badge"
+import { PDFDownloadLink } from "@react-pdf/renderer"
+import { LoanReceiptPDF } from "./loan-receipt-pdf"
 
 interface LoanTableProps {
   loans: LoanSession[];
@@ -107,6 +109,23 @@ export function LoanTable({ loans, onReturn }: LoanTableProps) {
                           <button className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all">
                             <span className="material-symbols-outlined text-xl">info</span>
                           </button>
+                          
+                          <PDFDownloadLink
+                            document={<LoanReceiptPDF loan={loan} />}
+                            fileName={`Receipt-${loan.recordCode}-${loan.borrowerName.replace(/\s+/g, '_')}.pdf`}
+                          >
+                            {({ loading }) => (
+                              <button 
+                                disabled={loading}
+                                className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-all"
+                                title="Download Tanda Terima"
+                              >
+                                <span className="material-symbols-outlined text-xl">
+                                  {loading ? 'sync' : 'print'}
+                                </span>
+                              </button>
+                            )}
+                          </PDFDownloadLink>
                         </div>
                       </td>
                     </motion.tr>

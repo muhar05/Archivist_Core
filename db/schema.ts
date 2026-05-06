@@ -12,6 +12,7 @@ export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   full_name: text("full_name").notNull(),
   email: text("email").notNull().unique(),
+  password: text("password").notNull(),
   role: text("role").$type<"admin" | "staff">().default("staff").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
@@ -85,7 +86,7 @@ export const reports = pgTable("reports", {
   client: text("client"),
   description: text("description"), // Keterangan
   metadata: jsonb("metadata").default({}).notNull(),
-  status: text("status").$type<"pending" | "pending_placement" | "archived" | "loaned">().default("pending").notNull(),
+  status: text("status").$type<"pending" | "pending_placement" | "archived" | "loaned" | "rejected">().default("pending").notNull(),
   created_by: uuid("created_by").references(() => profiles.id).notNull(),
   current_holder_id: uuid("current_holder_id").references(() => profiles.id),
   placement_confirmed_at: timestamp("placement_confirmed_at"),
@@ -132,6 +133,8 @@ export const roomsRelations = relations(rooms, ({ many }) => ({
 
 export const storageUnitsRelations = relations(storageUnits, ({ one, many }) => ({
   room: one(rooms, { fields: [storageUnits.room_id], references: [rooms.id] }),
+  parent: one(storageUnits, { fields: [storageUnits.parent_id], references: [storageUnits.id], relationName: "parent_unit" }),
+  children: many(storageUnits, { relationName: "parent_unit" }),
   lockers: many(lockers),
   reports: many(reports),
 }));

@@ -2,38 +2,47 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { reportService } from "@/services/reportService"
+import { requestDepositAction, getSopRequirementsAction } from "@/actions/reportActions"
 import { useSession } from "next-auth/react"
-import { getAssignableUnitsAction } from "@/actions/locationActions"
+import { useSearchParams, useRouter } from "next/navigation"
+import { getAssignableUnitsAction, getUnitHierarchyAction } from "@/actions/locationActions"
 import { toast } from "sonner"
+import { Package, Lock, Info, ClipboardCheck, FileText } from "lucide-react"
 
-const SOP_CHECKLIST = [
-  "Halaman Lengkap (Sesuai Daftar Isi)",
-  "Tanda Tangan & Cap Basah Tersedia",
-  "Hardcover/Softcover Sesuai Standard",
-  "Tidak Ada Coretan/Kerusakan Fisik",
-  "Metadata Digital Sesuai Fisik"
-]
+
 
 interface DepositFormData {
   report_number: string;
   title: string;
   client: string;
   unit_id: string;
-  thickness: string;
 }
-
 export const DepositForm = () => {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initialUnitId = searchParams.get("unitId") || ""
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const [formData, setFormData] = useState<DepositFormData>({
     report_number: "",
     title: "",
     client: "",
-    unit_id: "",
-    thickness: ""
+    unit_id: initialUnitId
   })
   const [checklist, setChecklist] = useState<string[]>([])
+
+  // Update unit_id if search params change
+  React.useEffect(() => {
+    if (initialUnitId) {
+      setFormData(prev => ({ ...prev, unit_id: initialUnitId }))
+    }
+  }, [initialUnitId])
+
+  // Fetch SOP Requirements
+  const { data: sopRequirements } = useQuery({
+    queryKey: ["sop-requirements"],
+    queryFn: () => getSopRequirementsAction()
+  })
 
   // Fetch assignable units
   const { data: units } = useQuery({
@@ -41,19 +50,25 @@ export const DepositForm = () => {
     queryFn: () => getAssignableUnitsAction()
   })
 
+  // Fetch specific unit if ID is provided
+  const { data: specificUnit, isLoading: isUnitLoading } = useQuery({
+    queryKey: ["unit-hierarchy", initialUnitId],
+    queryFn: () => getUnitHierarchyAction(initialUnitId),
+    enabled: !!initialUnitId
+  })
+
   const mutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
       const user = session?.user as { id: string }
       if (!user) throw new Error("Unauthorized")
 
-      return reportService.requestDeposit({
+      return requestDepositAction({
         report_number: data.report_number,
         title: data.title,
         client: data.client,
         unit_id: data.unit_id,
         created_by: user.id,
         metadata: {
-          thickness_cm: data.thickness,
           sop_checklist: checklist
         }
       })
@@ -61,8 +76,11 @@ export const DepositForm = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] })
       toast.success("Deposit request submitted successfully!")
-      setFormData({ report_number: "", title: "", client: "", unit_id: "", thickness: "" })
-      setChecklist([])
+      
+      // Redirect back to the locker page
+      if (formData.unit_id) {
+        router.push(`/location/${formData.unit_id}`)
+      }
     },
     onError: (error: Error) => {
       toast.error(`Error: ${error.message}`)
@@ -72,7 +90,7 @@ export const DepositForm = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (checklist.length < SOP_CHECKLIST.length) {
+    if (!sopRequirements || checklist.length < sopRequirements.length) {
       return toast.error("Please complete all SOP checklist items")
     }
     mutation.mutate(formData)
@@ -85,10 +103,10 @@ export const DepositForm = () => {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-8 max-w-2xl">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-8 w-full">
       <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6 flex flex-col gap-6">
         <div className="flex items-center gap-2 text-blue-400">
-          <span className="material-symbols-outlined">description</span>
+          <FileText className="w-4 h-4" />
           <h3 className="text-sm font-bold uppercase tracking-widest">Report Metadata</h3>
         </div>
 
@@ -115,7 +133,7 @@ export const DepositForm = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase">Client / Project</label>
             <input 
@@ -126,48 +144,52 @@ export const DepositForm = () => {
               className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase">Estimated Thickness (cm)</label>
-            <input 
-              required
-              type="number"
-              value={formData.thickness}
-              onChange={e => setFormData({...formData, thickness: e.target.value})}
-              placeholder="e.g. 5"
-              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
-            />
-          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold text-slate-500 uppercase">Target Locker</label>
-          <select 
-            required
-            value={formData.unit_id}
-            onChange={e => setFormData({...formData, unit_id: e.target.value})}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
-          >
-            <option value="" disabled>Select a locker</option>
-            {units?.map(u => (
-              <option key={u.id} value={u.id}>{u.name} (Status: {u.status})</option>
-            ))}
-          </select>
+          {initialUnitId ? (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Package className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-bold text-blue-100">
+                  {isUnitLoading ? "Scanning location..." : specificUnit?.data?.name || "Locker not found"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-blue-500/60 uppercase tracking-widest">Locked Location</span>
+                <Lock className="w-3 h-3 text-blue-500" />
+              </div>
+            </div>
+          ) : (
+            <select 
+              required
+              value={formData.unit_id}
+              onChange={e => setFormData({...formData, unit_id: e.target.value})}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
+            >
+              <option value="" disabled>Select a locker</option>
+              {units?.map(u => (
+                <option key={u.id} value={u.id}>{u.name} (Status: {u.status})</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
       <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6 flex flex-col gap-4">
         <div className="flex items-center gap-2 text-yellow-500">
-          <span className="material-symbols-outlined">rule</span>
+          <ClipboardCheck className="w-4 h-4" />
           <h3 className="text-sm font-bold uppercase tracking-widest">SOP Checklist</h3>
         </div>
         <p className="text-xs text-slate-500">Verify all physical requirements are met before submission.</p>
 
         <div className="flex flex-col gap-2 mt-2">
-          {SOP_CHECKLIST.map((item) => (
+          {sopRequirements?.map((item) => (
             <label 
-              key={item}
+              key={item.id}
               className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                checklist.includes(item) 
+                checklist.includes(item.name) 
                   ? "bg-blue-500/10 border-blue-500/30 text-blue-200" 
                   : "bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800"
               }`}
@@ -175,13 +197,18 @@ export const DepositForm = () => {
               <input 
                 type="checkbox"
                 className="hidden"
-                checked={checklist.includes(item)}
-                onChange={() => toggleChecklist(item)}
+                checked={checklist.includes(item.name)}
+                onChange={() => toggleChecklist(item.name)}
               />
-              <span className={`material-symbols-outlined text-sm ${checklist.includes(item) ? "text-blue-400" : "text-slate-600"}`}>
-                {checklist.includes(item) ? "check_circle" : "radio_button_unchecked"}
-              </span>
-              <span className="text-sm font-medium">{item}</span>
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                checklist.includes(item.name) ? "bg-blue-500 border-blue-400" : "bg-slate-900 border-slate-700"
+              }`}>
+                {checklist.includes(item.name) && <ClipboardCheck className="w-3 h-3 text-white" />}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{item.name}</span>
+                {item.description && <span className="text-[10px] text-slate-500">{item.description}</span>}
+              </div>
             </label>
           ))}
         </div>
@@ -189,7 +216,7 @@ export const DepositForm = () => {
 
       <div className="flex items-center justify-between p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-blue-400">info</span>
+          <Info className="w-4 h-4 text-blue-400" />
           <p className="text-xs text-slate-400 max-w-sm">Status will be <span className="text-yellow-500 font-bold uppercase">Pending</span>. An Admin will verify the physical report before archiving.</p>
         </div>
         <button 

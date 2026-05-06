@@ -26,6 +26,10 @@ export async function approveReportAction(reportId: string, adminId: string) {
   return await reportService.approveReport(reportId, adminId);
 }
 
+export async function rejectReportAction(reportId: string, adminId: string, reason: string) {
+  return await reportService.rejectReport(reportId, adminId, reason);
+}
+
 export async function searchReportsAction(query: string) {
   return await reportService.searchReports(query);
 }
@@ -36,4 +40,8 @@ export async function confirmPlacementAction(reportId: string, staffId: string) 
 
 export async function getReportsByStaffAction(staffId: string) {
   return await reportService.getReportsByStaff(staffId);
+}
+
+export async function getSopRequirementsAction() {
+  return await reportService.getSopRequirements();
 }
