@@ -3,20 +3,57 @@
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArchivalRecord } from "../locations/types"
-import { RecordStatusBadge, RecordPriorityBadge } from "./record-badges"
+import { RecordStatusBadge } from "./record-badges"
 
 interface RecordTableProps {
   records: ArchivalRecord[];
+  onView?: (record: ArchivalRecord) => void;
+  onEdit?: (record: ArchivalRecord) => void;
+  onDelete?: (recordId: string) => void;
 }
 
-export function RecordTable({ records }: RecordTableProps) {
+export function RecordTable({ records, onView, onEdit, onDelete }: RecordTableProps) {
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterCategory, setFilterCategory] = useState<string>("ALL");
 
-  const filteredRecords = records.filter(r => 
-    r.title.toLowerCase().includes(search.toLowerCase()) ||
-    r.code.toLowerCase().includes(search.toLowerCase()) ||
-    r.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const categories = Array.from(new Set(records.map(r => r.category)));
+
+  const filteredRecords = records.filter(r => {
+    const matchesSearch = r.title.toLowerCase().includes(search.toLowerCase()) ||
+                         r.code.toLowerCase().includes(search.toLowerCase()) ||
+                         r.category.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = filterStatus === "ALL" || r.status === filterStatus;
+    const matchesCategory = filterCategory === "ALL" || r.category === filterCategory;
+    
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
+  const handleExport = () => {
+    const headers = ["ID", "Title", "Code", "Category", "Status", "Location", "Registered At"];
+    const csvContent = [
+      headers.join(","),
+      ...filteredRecords.map(r => [
+        r.id,
+        `"${r.title}"`,
+        r.code,
+        r.category,
+        r.status,
+        `"${r.location}"`,
+        r.registeredAt
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `archivist_records_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6">
@@ -35,14 +72,37 @@ export function RecordTable({ records }: RecordTableProps) {
           />
         </div>
         
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all">
-            <span className="material-symbols-outlined text-sm">filter_list</span>
-            Filters
-          </button>
-          <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-outline-variant/10 text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-all">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-outline-variant/10 rounded-2xl p-1.5 shadow-sm">
+             <select 
+               value={filterStatus}
+               onChange={(e) => setFilterStatus(e.target.value)}
+               className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none px-3 py-2 cursor-pointer hover:text-primary transition-colors"
+             >
+                <option value="ALL">All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="BORROWED">Borrowed</option>
+                <option value="PENDING">Pending</option>
+             </select>
+             <div className="w-px h-4 bg-outline-variant/10" />
+             <select 
+               value={filterCategory}
+               onChange={(e) => setFilterCategory(e.target.value)}
+               className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none px-3 py-2 cursor-pointer hover:text-primary transition-colors"
+             >
+                <option value="ALL">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+             </select>
+          </div>
+
+          <button 
+            onClick={handleExport}
+            className="flex items-center gap-3 px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-xl shadow-slate-900/10 dark:shadow-white/5 active:scale-95"
+          >
             <span className="material-symbols-outlined text-sm">file_download</span>
-            Export
+            Export CSV
           </button>
         </div>
       </div>
@@ -56,7 +116,6 @@ export function RecordTable({ records }: RecordTableProps) {
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Record Identity</th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Category</th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
-                <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Priority</th>
                 <th className="px-6 py-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
               </tr>
             </thead>
@@ -91,20 +150,30 @@ export function RecordTable({ records }: RecordTableProps) {
                     <td className="px-6 py-6">
                       <RecordStatusBadge status={record.status} />
                     </td>
-                    <td className="px-6 py-6">
-                      <RecordPriorityBadge priority={record.priority} />
-                    </td>
                     <td className="px-6 py-6 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all scale-100 active:scale-90">
+                        <button 
+                          onClick={() => onView?.(record)}
+                          className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all scale-100 active:scale-90"
+                        >
                           <span className="material-symbols-outlined text-xl">visibility</span>
                         </button>
-                        <button className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all scale-100 active:scale-90">
-                          <span className="material-symbols-outlined text-xl">edit</span>
-                        </button>
-                        <button className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all scale-100 active:scale-90">
-                          <span className="material-symbols-outlined text-xl">delete</span>
-                        </button>
+                        {onEdit && (
+                          <button 
+                            onClick={() => onEdit?.(record)}
+                            className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all scale-100 active:scale-90"
+                          >
+                            <span className="material-symbols-outlined text-xl">edit</span>
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button 
+                            onClick={() => onDelete?.(record.id)}
+                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all scale-100 active:scale-90"
+                          >
+                            <span className="material-symbols-outlined text-xl">delete</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </motion.tr>

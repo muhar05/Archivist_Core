@@ -1,8 +1,17 @@
 "use client"
 
 import React from "react"
-import type { Report } from "@/services/reportService"
-import { Plus, Search, FileText, User, ArrowUpRight, ArrowDownLeft, Eye } from "lucide-react"
+import { Plus, Search, FileText, User, ArrowUpRight, ArrowDownLeft, Eye, MessageSquare, Check } from "lucide-react"
+import { type Report } from "@/services/reportService"
+
+interface ReportMetadata {
+  is_sop_complete?: boolean;
+  sop_checklist?: string[];
+  rejection_reason?: string;
+  admin_notes?: string;
+  verified_at?: string;
+  rejected_at?: string;
+}
 
 interface LockerViewProps {
   reports: (Report & { creator: { full_name: string } })[]
@@ -10,6 +19,7 @@ interface LockerViewProps {
   onDeposit?: () => void
   onLoan?: (reportId: string) => void
   onView?: (reportId: string) => void
+  onConfirmPlacement?: (reportId: string) => void
   currentStatus?: "available" | "low_space" | "full"
   onStatusChange?: (status: "available" | "low_space" | "full") => void
 }
@@ -20,6 +30,7 @@ export const LockerView: React.FC<LockerViewProps> = ({
   onDeposit,
   onLoan,
   onView,
+  onConfirmPlacement,
   currentStatus = "available",
   onStatusChange
 }) => {
@@ -107,19 +118,44 @@ export const LockerView: React.FC<LockerViewProps> = ({
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg ${
-                           report.status === 'archived' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                           report.status === 'pending' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
-                           'bg-blue-500/10 border-blue-500/20 text-blue-500'
+                            report.status === 'archived' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
+                            report.status === 'pending' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
+                            report.status === 'rejected' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                            'bg-blue-500/10 border-blue-500/20 text-blue-500'
                         }`}>
                           <FileText className="w-5 h-5" />
                         </div>
                         <div>
-                          <div className="font-bold text-white text-sm group-hover:text-blue-400 transition-colors">{report.title}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-bold text-white text-sm group-hover:text-blue-400 transition-colors">{report.title}</div>
+                            {(report.metadata as ReportMetadata)?.is_sop_complete === false && (
+                              <div className="px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[8px] font-black text-red-500 uppercase tracking-widest flex items-center gap-1">
+                                <div className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
+                                Data Belum Lengkap
+                              </div>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <div className="text-[10px] text-slate-500 font-mono tracking-tighter">ID: {report.id}</div>
                             <div className="w-1 h-1 rounded-full bg-slate-700" />
-                            <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">#{report.report_number}</div>
+                          <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">#{report.report_number}</div>
                           </div>
+                          
+                          {((report.metadata as ReportMetadata)?.rejection_reason || (report.metadata as ReportMetadata)?.admin_notes) && (
+                            <div className={`mt-2 flex items-start gap-2 p-2 rounded-lg border max-w-xs ${
+                              report.status === 'rejected' ? 'bg-rose-500/5 border-rose-500/10' : 'bg-slate-950/40 border-white/5'
+                            }`}>
+                              <MessageSquare className={`w-3 h-3 mt-0.5 shrink-0 ${report.status === 'rejected' ? 'text-rose-500' : 'text-slate-500'}`} />
+                              <div className="flex flex-col gap-0.5">
+                                <span className={`text-[8px] font-black uppercase tracking-widest ${report.status === 'rejected' ? 'text-rose-600' : 'text-slate-600'}`}>
+                                  {report.status === 'rejected' ? 'Alasan Penolakan:' : 'Catatan Admin:'}
+                                </span>
+                                <p className={`text-[10px] leading-tight italic ${report.status === 'rejected' ? 'text-rose-300/70' : 'text-slate-400'}`}>
+                                  {(report.metadata as ReportMetadata)?.rejection_reason || (report.metadata as ReportMetadata)?.admin_notes}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -128,11 +164,13 @@ export const LockerView: React.FC<LockerViewProps> = ({
                       <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                         report.status === "archived" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
                         report.status === "pending" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                        report.status === "rejected" ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" :
                         "bg-blue-500/10 text-blue-500 border border-blue-500/20"
                       }`}>
                         <div className={`w-1 h-1 rounded-full ${
                            report.status === "archived" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
                            report.status === "pending" ? "bg-amber-500" :
+                           report.status === "rejected" ? "bg-rose-500" :
                            "bg-blue-500"
                         }`} />
                         {report.status}
@@ -163,6 +201,14 @@ export const LockerView: React.FC<LockerViewProps> = ({
                           >
                             <ArrowUpRight className="w-4 h-4" />
                             Pinjam
+                          </button>
+                        ) : report.status === 'pending_placement' ? (
+                          <button 
+                            onClick={() => onConfirmPlacement?.(report.id)}
+                            className="h-9 px-4 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
+                          >
+                            <Check className="w-4 h-4" />
+                            Konfirmasi Penempatan
                           </button>
                         ) : report.status === 'loaned' ? (
                            <button 

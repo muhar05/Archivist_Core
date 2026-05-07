@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { useState } from "react"
-import { signIn } from "next-auth/react"
+import { signIn, getSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Image from "next/image"
@@ -48,7 +48,18 @@ export default function LoginPage() {
       }
 
       toast.success("Berhasil Masuk", { description: "Mengarahkan ke dashboard..." })
-      router.push("/")
+      
+      const session = await getSession()
+      const role = (session?.user as { role?: string })?.role
+      
+      if (role === "admin") {
+        router.push("/admin/approvals")
+      } else if (role === "staff") {
+        router.push("/staff/deposit")
+      } else {
+        router.push("/dashboard")
+      }
+      
       router.refresh()
     } catch (err) {
       console.error(err)
@@ -60,23 +71,23 @@ export default function LoginPage() {
 
 
   return (
-    <div className="bg-surface font-body text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen antialiased">
+    <div className="bg-slate-50 dark:bg-slate-950 font-body text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen antialiased transition-colors">
       {/* TopNavBar */}
-      <nav className="fixed top-0 w-full bg-slate-50/80 backdrop-blur-md border-b border-outline-variant/5 flex justify-between items-center px-8 h-16 z-50">
+      <nav className="fixed top-0 w-full bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-outline-variant/5 dark:border-white/5 flex justify-between items-center px-8 h-16 z-50">
         <div className="flex items-center gap-3">
           <Warehouse className="text-primary w-6 h-6" />
-          <Link href="/" className="text-xl font-bold tracking-tighter text-slate-900">Archivist Core</Link>
+          <Link href="/" className="text-xl font-bold tracking-tighter text-slate-900 dark:text-white">Archivist Core</Link>
         </div>
         <div className="flex items-center space-x-6">
           <div className="hidden md:flex space-x-6">
-            <Link className="text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold" href="#">About</Link>
-            <Link className="text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold" href="#">Security</Link>
+            <Link className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors text-sm font-semibold" href="#">About</Link>
+            <Link className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors text-sm font-semibold" href="#">Security</Link>
           </div>
           <div className="flex items-center gap-3">
-            <button className="p-2 text-slate-500 hover:bg-slate-200/50 transition-colors rounded-full">
+            <button className="p-2 text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors rounded-full">
               <HelpCircle className="w-5 h-5" />
             </button>
-            <button className="p-2 text-slate-500 hover:bg-slate-200/50 transition-colors rounded-full">
+            <button className="p-2 text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors rounded-full">
               <Globe className="w-5 h-5" />
             </button>
             <motion.button 
@@ -100,7 +111,7 @@ export default function LoginPage() {
             fill
             priority
           />
-          <div className="absolute inset-0 bg-linear-to-tr from-surface via-surface/90 to-transparent"></div>
+          <div className="absolute inset-0 bg-linear-to-tr from-slate-50 via-slate-50/90 to-transparent dark:from-slate-950 dark:via-slate-950/90"></div>
         </div>
 
         <motion.section 
@@ -109,14 +120,14 @@ export default function LoginPage() {
           className="relative z-10 w-full max-w-md px-4"
         >
           {/* Login Card */}
-          <div className="bg-white/70 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 p-8 md:p-10">
+          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 dark:border-white/5 p-8 md:p-10">
             {/* Branding & Welcome */}
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-container/30 rounded-full mb-4">
                 <Warehouse className="text-primary w-8 h-8" />
               </div>
-              <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 mb-2">Welcome Back</h1>
-              <p className="text-slate-500 text-sm font-medium">Secure Access to Physical Archives</p>
+              <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">Welcome Back</h1>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Secure Access to Physical Archives</p>
             </div>
 
             {/* Login Form */}
@@ -126,7 +137,7 @@ export default function LoginPage() {
                 <div className="relative group">
                   <User className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 transition-colors group-focus-within:text-primary" />
                   <input 
-                    className="w-full pl-8 py-3 bg-transparent border-b border-slate-200 focus:border-primary transition-all text-sm placeholder:text-slate-300 outline-none" 
+                    className="w-full pl-8 py-3 bg-transparent border-b border-slate-200 dark:border-slate-800 focus:border-primary transition-all text-sm placeholder:text-slate-300 dark:placeholder:text-slate-600 text-slate-900 dark:text-white outline-none" 
                     id="email" 
                     name="email" 
                     placeholder="e.g. archivist_01" 
@@ -143,7 +154,7 @@ export default function LoginPage() {
                 <div className="relative group">
                   <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 transition-colors group-focus-within:text-primary" />
                   <input 
-                    className="w-full pl-8 py-3 bg-transparent border-b border-slate-200 focus:border-primary transition-all text-sm placeholder:text-slate-300 outline-none" 
+                    className="w-full pl-8 py-3 bg-transparent border-b border-slate-200 dark:border-slate-800 focus:border-primary transition-all text-sm placeholder:text-slate-300 dark:placeholder:text-slate-600 text-slate-900 dark:text-white outline-none" 
                     id="password" 
                     name="password" 
                     placeholder="••••••••••••" 
@@ -165,8 +176,8 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between">
                 <label className="flex items-center space-x-2 cursor-pointer group">
-                  <input className="peer h-4 w-4 rounded-md border-slate-300 text-primary focus:ring-primary/20 transition-all" type="checkbox"/>
-                  <span className="text-xs font-medium text-slate-500 group-hover:text-slate-900 transition-colors">Remember Me</span>
+                  <input className="peer h-4 w-4 rounded-md border-slate-300 dark:border-slate-700 bg-transparent text-primary focus:ring-primary/20 transition-all" type="checkbox"/>
+                  <span className="text-xs font-medium text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Remember Me</span>
                 </label>
                 <Link className="text-xs font-bold text-primary hover:text-primary/80 transition-all font-heading" href="#">Forgot Password?</Link>
               </div>
@@ -183,10 +194,10 @@ export default function LoginPage() {
             </form>
 
             {/* Footer Note inside Card */}
-            <div className="mt-10 pt-6 border-t border-slate-100">
+            <div className="mt-10 pt-6 border-t border-slate-100 dark:border-white/5">
               <div className="flex gap-3 px-2">
                 <ShieldAlert className="text-amber-500 w-5 h-5 shrink-0" />
-                <p className="text-[11px] leading-relaxed text-slate-400 font-medium italic">
+                <p className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 font-medium italic">
                   Authorized Personnel Only. System usage is monitored and logged for security audit purposes.
                 </p>
               </div>
@@ -195,11 +206,11 @@ export default function LoginPage() {
 
           {/* Quick Help Links below card */}
           <div className="mt-8 flex justify-center space-x-8">
-            <Link className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] hover:text-slate-900 transition-all" href="#">
+            <Link className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] hover:text-slate-900 dark:hover:text-white transition-all" href="#">
               <Lock className="w-3.5 h-3.5" />
               Security
             </Link>
-            <Link className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] hover:text-slate-900 transition-all" href="#">
+            <Link className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] hover:text-slate-900 dark:hover:text-white transition-all" href="#">
               <Activity className="w-3.5 h-3.5" />
               Status
             </Link>
@@ -208,7 +219,7 @@ export default function LoginPage() {
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 w-full bg-white/50 backdrop-blur-sm border-t border-slate-100/50 hidden md:flex flex-row justify-between items-center px-10 py-5 z-50">
+      <footer className="fixed bottom-0 w-full bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-t border-slate-100/50 dark:border-white/5 hidden md:flex flex-row justify-between items-center px-10 py-5 z-50">
         <span className="text-xs font-medium text-slate-400 opacity-80">© 2024 Archival Core. Precision Digital Archiving.</span>
         <div className="flex flex-row space-x-6">
           <Link className="text-xs font-medium text-slate-400 hover:text-primary transition-colors" href="#">Privacy</Link>

@@ -2,15 +2,29 @@
 
 import React, { useState } from "react"
 import { motion } from "framer-motion"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { getAllReportsAction } from "@/actions/reportActions"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getAllReportsAction, deleteReportAction, updateReportAction, createReportAction } from "@/actions/reportActions"
 import { RecordTable } from "@/components/dashboard/records/record-table"
 import { AddRecordDialog } from "@/components/dashboard/records/add-record-dialog"
-import { RecordStatus, RecordPriority } from "@/components/dashboard/locations/types"
+import { ReportDetailDialog } from "@/components/dashboard/records/report-detail-dialog"
+import { RecordStatus, RecordPriority, ArchivalRecord } from "@/components/dashboard/locations/types"
+import { toast } from "sonner"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { type Report } from "@/services/reportService"
 
 export default function RecordsPage() {
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<ArchivalRecord | null>(null);
+  const [selectedReportForView, setSelectedReportForView] = useState<(Report & { creator?: { full_name: string } }) | null>(null);
+
+  const { data: session } = useQuery({ 
+    queryKey: ["session"], 
+    queryFn: () => fetch("/api/auth/session").then(res => res.json()) 
+  });
+  const isAdmin = session?.user?.role === "admin";
 
   // Fetch real data from database
   const { data: rawReports, isLoading } = useQuery({
@@ -22,13 +36,52 @@ export default function RecordsPage() {
   const reports = (rawReports || []).map((r) => ({
     id: r.id,
     title: r.title,
-    code: r.id.split("-")[0].toUpperCase(),
+    code: r.report_number || r.id.split("-")[0].toUpperCase(),
     category: "General",
-    status: (r.status === "archived" ? "ACTIVE" : r.status === "loaned" ? "BORROWED" : "PENDING") as RecordStatus,
+    status: (r.status === "archived" ? "ACTIVE" : r.status === "loaned" ? "BORROWED" : r.status === "pending" ? "PENDING" : "ARCHIVED") as RecordStatus,
     priority: "MEDIUM" as RecordPriority,
     location: r.unit ? `${r.unit.room?.name || "Room"} - ${r.unit.name}` : "Unknown",
     registeredAt: new Date(r.created_at).toISOString().split('T')[0],
+    description: r.description || undefined,
   }));
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteReportAction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      toast.success("Arsip berhasil dihapus");
+      setIsDeleteOpen(false);
+    },
+    onError: () => toast.error("Gagal menghapus arsip")
+  });
+
+  const upsertMutation = useMutation({
+    mutationFn: (data: { title: string; code: string; status: RecordStatus; description: string }) => {
+      if (selectedRecord) {
+        return updateReportAction(selectedRecord.id, {
+          title: data.title,
+          report_number: data.code,
+          status: data.status.toLowerCase() as "pending" | "pending_placement" | "archived" | "loaned" | "rejected",
+          description: data.description
+        });
+      }
+      return createReportAction({
+        title: data.title,
+        report_number: data.code,
+        status: data.status.toLowerCase() as "pending" | "pending_placement" | "archived" | "loaned" | "rejected",
+        description: data.description,
+        client: "Internal",
+        created_by: "system" 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      toast.success(selectedRecord ? "Arsip berhasil diperbarui" : "Arsip berhasil didaftarkan");
+      setIsAddOpen(false);
+      setSelectedRecord(null);
+    },
+    onError: () => toast.error("Terjadi kesalahan saat menyimpan data")
+  });
 
   const stats = [
     { label: "Total Arsip", value: reports.length, icon: "inventory_2", color: "text-primary bg-primary/10" },
@@ -60,13 +113,18 @@ export default function RecordsPage() {
           </h1>
         </div>
 
-        <button 
-          onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-3 primary-gradient px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-all scale-100 active:scale-95"
-        >
-          <span className="material-symbols-outlined text-lg">add_box</span>
-          Pendaftaran Arsip Baru
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={() => {
+              setSelectedRecord(null);
+              setIsAddOpen(true);
+            }}
+            className="flex items-center gap-3 primary-gradient px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-all scale-100 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-lg">add_box</span>
+            Pendaftaran Arsip Baru
+          </button>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -97,7 +155,24 @@ export default function RecordsPage() {
         transition={{ delay: 0.4 }}
       >
         {reports.length > 0 ? (
-          <RecordTable records={reports} />
+          <RecordTable 
+            records={reports} 
+            onView={(record) => {
+              const report = rawReports?.find(r => r.id === record.id);
+              if (report) {
+                setSelectedReportForView(report);
+                setIsViewOpen(true);
+              }
+            }}
+            onEdit={isAdmin ? (record) => {
+              setSelectedRecord(record);
+              setIsAddOpen(true);
+            } : undefined}
+            onDelete={isAdmin ? (id) => {
+              setSelectedRecord(reports.find(r => r.id === id) || null);
+              setIsDeleteOpen(true);
+            } : undefined}
+          />
         ) : (
           <div className="py-24 flex flex-col items-center justify-center bg-slate-900/50 rounded-4xl border border-dashed border-slate-800 text-slate-500 gap-4">
             <span className="material-symbols-outlined text-6xl opacity-20">folder_off</span>
@@ -109,15 +184,44 @@ export default function RecordsPage() {
         )}
       </motion.div>
 
-      {/* Add Record Modal */}
+      {/* Dialogs */}
       <AddRecordDialog 
         isOpen={isAddOpen} 
-        onClose={() => setIsAddOpen(false)} 
-        onAdd={() => {
-          queryClient.invalidateQueries({ queryKey: ["reports"] });
+        onClose={() => {
           setIsAddOpen(false);
+          setSelectedRecord(null);
         }} 
+        initialData={selectedRecord}
+        onAdd={(data) => upsertMutation.mutate(data)} 
       />
+
+      <ReportDetailDialog 
+        isOpen={isViewOpen}
+        onClose={() => setIsViewOpen(false)}
+        report={selectedReportForView}
+      />
+
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Arsip Digital?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini tidak dapat dibatalkan. Menghapus data arsip ini akan menghilangkan catatan digital dari sistem secara permanen.
+              <div className="mt-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-white/5">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Arsip yang akan dihapus:</p>
+                <p className="text-sm font-black text-white">{selectedRecord?.title}</p>
+                <p className="text-[10px] text-slate-500 font-mono">{selectedRecord?.code}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batalkan</AlertDialogCancel>
+            <AlertDialogAction onClick={() => selectedRecord && deleteMutation.mutate(selectedRecord.id)} className="bg-rose-500 hover:bg-rose-600">
+              Hapus Permanen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -27,6 +27,7 @@ interface ArchitectCanvasProps {
   gridHeight: number
   roomWidthCm: number
   roomHeightCm: number
+  ceilingHeight?: number
   readOnly?: boolean
   isElevationMode?: boolean
   backgroundLabel?: string
@@ -41,6 +42,7 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
   gridHeight,
   roomWidthCm,
   roomHeightCm,
+  ceilingHeight = 300,
   readOnly = false,
   isElevationMode = false,
   backgroundLabel
@@ -48,6 +50,7 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [zoom, setZoom] = useState(0.8)
   const [is3D, setIs3D] = useState(false)
+  const [xRayMode, setXRayMode] = useState(false)
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 })
   const [activeTool, setActiveTool] = useState<'SELECT' | 'HAND'>('SELECT')
   const stageRef = useRef<Konva.Stage>(null)
@@ -146,8 +149,8 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
               {/* Back Walls */}
               <Line 
                 points={[
-                  ...Object.values(toIso(0, 0, 300)),
-                  ...Object.values(toIso(roomWidthCm, 0, 300)),
+                  ...Object.values(toIso(0, 0, ceilingHeight)),
+                  ...Object.values(toIso(roomWidthCm, 0, ceilingHeight)),
                   ...Object.values(toIso(roomWidthCm, 0, 0)),
                   ...Object.values(toIso(0, 0, 0)),
                 ]}
@@ -158,8 +161,8 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
               />
               <Line 
                 points={[
-                  ...Object.values(toIso(0, 0, 300)),
-                  ...Object.values(toIso(0, roomHeightCm, 300)),
+                  ...Object.values(toIso(0, 0, ceilingHeight)),
+                  ...Object.values(toIso(0, roomHeightCm, ceilingHeight)),
                   ...Object.values(toIso(0, roomHeightCm, 0)),
                   ...Object.values(toIso(0, 0, 0)),
                 ]}
@@ -168,7 +171,7 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
                 stroke="#334155"
                 strokeWidth={1}
               />
-              {/* Floor */}
+              {/* Floor with Grid */}
               <Line 
                 points={[
                   ...Object.values(toIso(0, 0)),
@@ -177,10 +180,38 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
                   ...Object.values(toIso(0, roomHeightCm)),
                 ]}
                 closed
-                fill="#020617"
+                fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+                fillLinearGradientEndPoint={{ x: roomWidthCm, y: roomHeightCm }}
+                fillLinearGradientColorStops={[0, "#0f172a", 1, "#020617"]}
                 stroke="#1e293b"
                 strokeWidth={2}
               />
+              
+              {/* Isometric Grid Lines */}
+              {Array.from({ length: Math.floor(roomWidthCm / gridWidth) + 1 }).map((_, i) => (
+                <Line
+                  key={`iso-v-${i}`}
+                  points={[
+                    ...Object.values(toIso(i * gridWidth, 0)),
+                    ...Object.values(toIso(i * gridWidth, roomHeightCm))
+                  ]}
+                  stroke="#334155"
+                  strokeWidth={0.5}
+                  opacity={0.15}
+                />
+              ))}
+              {Array.from({ length: Math.floor(roomHeightCm / gridWidth) + 1 }).map((_, i) => (
+                <Line
+                  key={`iso-h-${i}`}
+                  points={[
+                    ...Object.values(toIso(0, i * gridWidth)),
+                    ...Object.values(toIso(roomWidthCm, i * gridWidth))
+                  ]}
+                  stroke="#334155"
+                  strokeWidth={0.5}
+                  opacity={0.15}
+                />
+              ))}
             </>
           ) : (
             <Rect 
@@ -238,101 +269,132 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
           y={is3D ? dimensions.height / 4 : dimensions.height / 2 - (roomHeightCm * zoom) / 2}
         >
           {[...units]
-            .sort((a, b) => (Number(a.x) + Number(a.y)) - (Number(b.x) + Number(b.y)))
+            .sort((a, b) => (Number(a.x) + Number(a.y) + (Number(a.z) || 0)) - (Number(b.x) + Number(b.y) + (Number(b.z) || 0)))
             .map((unit) => {
-            const w = (Number(unit.width) || 100);
-            const h = (Number(unit.height) || 100);
-            const d = (Number(unit.depth) || 40);
-            const z = Number(unit.z) || 0;
-            const type = unit.unit_type || 'CABINET';
-            const iso = toIso(unit.x, unit.y, z);
+              const w = (Number(unit.width) || 100);
+              const h = (Number(unit.height) || 100);
+              const d = (Number(unit.depth) || 40);
+              const z = Number(unit.z) || 0;
+              const type = unit.unit_type || 'CABINET';
+              const iso = toIso(unit.x, unit.y, z);
 
-            return (
-              <Group
-                key={unit.id}
-                x={iso.x}
-                y={iso.y}
-                rotation={!is3D ? (unit.rotation || 0) : 0}
-                draggable={!readOnly && !is3D && activeTool === 'SELECT'}
-                dragBoundFunc={(pos) => {
-                  if (is3D) return pos;
-                  
-                  // Get the layer's absolute position and scale
-                  const layer = stageRef.current?.findOne('.unit-layer');
-                  if (!layer) return pos;
-                  
-                  const transform = layer.getAbsoluteTransform().copy().invert();
-                  const localPos = transform.point(pos);
-                  
-                  const width = (Number(unit.width) || 100);
-                  const height = (Number(unit.height) || 100);
-                  
-                  // Clamp in local room coordinates (cm)
-                  const clampedX = Math.max(0, Math.min(localPos.x, roomWidthCm - width));
-                  const clampedY = Math.max(0, Math.min(localPos.y, roomHeightCm - height));
-                  
-                  // Convert back to absolute screen coordinates
-                  return layer.getAbsoluteTransform().point({ x: clampedX, y: clampedY });
-                }}
-                onDragEnd={(e) => {
-                  const newX = Math.round(e.target.x() / gridWidth) * gridWidth
-                  const newY = Math.round(e.target.y() / gridHeight) * gridHeight
-                  
-                  // Final clamp on drag end just in case
-                  const width = (Number(unit.width) || 100);
-                  const height = (Number(unit.height) || 100);
-                  const finalX = Math.max(0, Math.min(newX, roomWidthCm - width));
-                  const finalY = Math.max(0, Math.min(newY, roomHeightCm - height));
-                  
-                  onUnitMove(unit.id, finalX, finalY)
-                }}
-                onClick={() => activeTool === 'SELECT' && onUnitSelect(unit)}
-              >
-                 {is3D && type === 'CABINET' ? (
+              const isSelected = selectedUnitId === unit.id;
+              const opacity = xRayMode ? 0.3 : 0.85;
+
+              return (
+                <Group
+                  key={unit.id}
+                  x={iso.x}
+                  y={iso.y}
+                  rotation={!is3D ? (unit.rotation || 0) : 0}
+                  draggable={!readOnly && !is3D && activeTool === 'SELECT'}
+                  onDragEnd={(e) => {
+                    const newX = Math.round(e.target.x() / gridWidth) * gridWidth
+                    const newY = Math.round(e.target.y() / gridHeight) * gridHeight
+                    const width = (Number(unit.width) || 100);
+                    const height = (Number(unit.height) || 100);
+                    const finalX = Math.max(0, Math.min(newX, roomWidthCm - width));
+                    const finalY = Math.max(0, Math.min(newY, roomHeightCm - height));
+                    onUnitMove(unit.id, finalX, finalY)
+                  }}
+                  onClick={() => activeTool === 'SELECT' && onUnitSelect(unit)}
+                >
+                  {is3D && type === 'CABINET' ? (
+                    <>
+                      {/* Shadow / Glow if selected */}
+                      {isSelected && (
+                        <Line 
+                          points={[
+                            ...Object.values(toIso(-5, h + 5, 0)),
+                            ...Object.values(toIso(w + 5, h + 5, 0)),
+                            ...Object.values(toIso(w + 5, -5, 0)),
+                            ...Object.values(toIso(-5, -5, 0)),
+                          ]}
+                          closed
+                          fill="rgba(59, 130, 246, 0.4)"
+                          shadowBlur={20}
+                          shadowColor="#3b82f6"
+                        />
+                      )}
+
+                      {/* Bottom Base (Solid to ground the unit) */}
+                      <Line 
+                        points={[
+                          ...Object.values(toIso(0, 0, 0)),
+                          ...Object.values(toIso(w, 0, 0)),
+                          ...Object.values(toIso(w, h, 0)),
+                          ...Object.values(toIso(0, h, 0)),
+                        ]}
+                        closed
+                        fill="#1e293b" // Distinct from floor #0f172a
+                        stroke="#334155"
+                        strokeWidth={1}
+                        opacity={1}
+                      />
+
+                      {/* Left Face (Darkest) */}
+                      <Line 
+                        points={[
+                          ...Object.values(toIso(0, 0, 0)),
+                          ...Object.values(toIso(0, h, 0)),
+                          ...Object.values(toIso(0, h, d)),
+                          ...Object.values(toIso(0, 0, d)),
+                        ]}
+                        closed
+                        fill={isSelected ? "#2563eb" : "#1e3a8a"} 
+                        stroke={isSelected ? "#60a5fa" : "#3b82f6"}
+                        strokeWidth={1}
+                        opacity={isSelected ? 1 : opacity * 0.8} // Integrated with X-Ray mode
+                      />
+
+                      {/* Right Face (Medium) */}
+                      <Line 
+                        points={[
+                          ...Object.values(toIso(0, h, 0)),
+                          ...Object.values(toIso(w, h, 0)),
+                          ...Object.values(toIso(w, h, d)),
+                          ...Object.values(toIso(0, h, d)),
+                        ]}
+                        closed
+                        fill={isSelected ? "#1d4ed8" : "#1e40af"} 
+                        stroke={isSelected ? "#60a5fa" : "#3b82f6"}
+                        strokeWidth={1}
+                        opacity={isSelected ? 1 : opacity * 0.65} // Integrated with X-Ray mode
+                      />
+
+                      {/* Top Face (Lightest) */}
+                      <Line 
+                        points={[
+                          ...Object.values(toIso(0, 0, d)),
+                          ...Object.values(toIso(w, 0, d)),
+                          ...Object.values(toIso(w, h, d)),
+                          ...Object.values(toIso(0, h, d)),
+                        ]}
+                        closed
+                        fill={isSelected ? "#3b82f6" : "#3b82f6"} 
+                        stroke={isSelected ? "#93c5fd" : "#60a5fa"}
+                        strokeWidth={1}
+                        opacity={isSelected ? 1 : opacity} // Integrated with X-Ray mode
+                      />
+                    </>
+                ) : is3D && type === 'DOOR' ? (
                   <>
-                    {/* Front Face */}
+                    {/* Door Frame (The casing) */}
                     <Line 
                       points={[
-                        ...Object.values(toIso(0, h, 0)),
-                        ...Object.values(toIso(w, h, 0)),
-                        ...Object.values(toIso(w, h, d)),
-                        ...Object.values(toIso(0, h, d)),
+                        ...Object.values(toIso(-2, 0, 0)),
+                        ...Object.values(toIso(w + 2, 0, 0)),
+                        ...Object.values(toIso(w + 2, 0, (d || 210) + 2)),
+                        ...Object.values(toIso(-2, 0, (d || 210) + 2)),
                       ]}
                       closed
                       fill="#1e293b"
-                      stroke="#334155"
+                      stroke="#475569"
                       strokeWidth={1}
                     />
-                    {/* Side Face */}
-                    <Line 
-                      points={[
-                        ...Object.values(toIso(w, 0, 0)),
-                        ...Object.values(toIso(w, h, 0)),
-                        ...Object.values(toIso(w, h, d)),
-                        ...Object.values(toIso(w, 0, d)),
-                      ]}
-                      closed
-                      fill="#0f172a"
-                      stroke="#334155"
-                      strokeWidth={1}
-                    />
-                    {/* Top Face */}
-                    <Line 
-                      points={[
-                        ...Object.values(toIso(0, 0, d)),
-                        ...Object.values(toIso(w, 0, d)),
-                        ...Object.values(toIso(w, h, d)),
-                        ...Object.values(toIso(0, h, d)),
-                      ]}
-                      closed
-                      fill={selectedUnitId === unit.id ? "#3b82f6" : "#334155"}
-                      stroke={selectedUnitId === unit.id ? "#60a5fa" : "#475569"}
-                      strokeWidth={1}
-                    />
-                  </>
-                ) : is3D && type === 'DOOR' ? (
-                  <>
-                    {/* 3D Door Frame (Thinner) */}
+                    
+                    {/* Door Leaf (The actual door) */}
+                    {/* Front Face */}
                     <Line 
                       points={[
                         ...Object.values(toIso(0, 0, 0)),
@@ -341,16 +403,61 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
                         ...Object.values(toIso(0, 0, d || 210)),
                       ]}
                       closed
-                      fill="#475569"
+                      fill="#334155"
                       stroke="#64748b"
                       strokeWidth={1}
                     />
-                    {/* Door Line / Handle Detail */}
-                    <Circle 
-                      {...toIso(w * 0.85, 0, (d || 210) / 2)}
-                      radius={2}
-                      fill="#fbbf24"
+                    
+                    {/* Side/Thickness (Visible if door is slightly open or from angle) */}
+                    <Line 
+                      points={[
+                        ...Object.values(toIso(w, 0, 0)),
+                        ...Object.values(toIso(w, 5, 0)),
+                        ...Object.values(toIso(w, 5, d || 210)),
+                        ...Object.values(toIso(w, 0, d || 210)),
+                      ]}
+                      closed
+                      fill="#0f172a"
+                      stroke="#334155"
+                      strokeWidth={0.5}
                     />
+
+                    {/* Door Handle (Metallic) */}
+                    <Group {...toIso(w * 0.8, 0, (d || 210) / 2)}>
+                       <Circle 
+                         radius={3}
+                         fill="#fbbf24"
+                         shadowBlur={5}
+                         shadowColor="#fbbf24"
+                       />
+                       <Rect 
+                         x={-2}
+                         y={-1}
+                         width={6}
+                         height={2}
+                         fill="#f59e0b"
+                       />
+                    </Group>
+
+                    {/* Exit Sign (Small Detail) */}
+                    <Group {...toIso(w / 2 - 10, 0, (d || 210) * 0.8)}>
+                       <Rect 
+                         width={20}
+                         height={8}
+                         fill="#10b981"
+                         cornerRadius={1}
+                       />
+                       <Text 
+                         text="EXIT"
+                         width={20}
+                         height={8}
+                         align="center"
+                         verticalAlign="middle"
+                         fill="white"
+                         fontSize={4}
+                         fontStyle="bold"
+                       />
+                    </Group>
                   </>
                 ) : type === 'DOOR' ? (
                   <>
@@ -491,16 +598,33 @@ export const ArchitectCanvas: React.FC<ArchitectCanvasProps> = ({
         </div>
         
         {!isElevationMode && (
-          <button 
-            onClick={() => setIs3D(!is3D)}
-            className={`p-3 rounded-xl backdrop-blur-md border shadow-xl transition-all flex items-center justify-center ${
-              is3D 
-                ? "bg-blue-500 text-white border-blue-400" 
-                : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">{is3D ? "view_in_ar" : "view_quilt"}</span>
-          </button>
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={() => setIs3D(!is3D)}
+              className={`p-3 rounded-xl backdrop-blur-md border shadow-xl transition-all flex items-center justify-center ${
+                is3D 
+                  ? "bg-blue-500 text-white border-blue-400" 
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
+              }`}
+              title={is3D ? "Switch to 2D Blueprint" : "Switch to 3D Isometric"}
+            >
+              <span className="material-symbols-outlined text-sm">{is3D ? "view_quilt" : "view_in_ar"}</span>
+            </button>
+            
+            {is3D && (
+              <button 
+                onClick={() => setXRayMode(!xRayMode)}
+                className={`p-3 rounded-xl backdrop-blur-md border shadow-xl transition-all flex items-center justify-center ${
+                  xRayMode 
+                    ? "bg-amber-500 text-white border-amber-400 shadow-lg shadow-amber-500/20" 
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
+                }`}
+                title="Toggle X-Ray (Transparency)"
+              >
+                <span className="material-symbols-outlined text-sm">visibility_off</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
 

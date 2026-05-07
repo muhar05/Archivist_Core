@@ -2,38 +2,57 @@
 
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArchivalRecord, RecordStatus, RecordPriority } from "../locations/types"
+import { ArchivalRecord, RecordStatus } from "../locations/types"
 
 interface AddRecordDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (record: Omit<ArchivalRecord, "id" | "registeredAt">) => void;
+  onAdd: (data: { title: string; code: string; status: RecordStatus; description: string; category: string }) => void;
+  initialData?: ArchivalRecord | null;
 }
 
-export function AddRecordDialog({ isOpen, onClose, onAdd }: AddRecordDialogProps) {
+export function AddRecordDialog({ isOpen, onClose, onAdd, initialData }: AddRecordDialogProps) {
   const [formData, setFormData] = useState({
     title: "",
     code: "",
     category: "General",
     status: "ACTIVE" as RecordStatus,
-    priority: "MEDIUM" as RecordPriority,
-    location: "",
     description: "",
   });
+
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData({
+        title: initialData.title,
+        code: initialData.code,
+        category: initialData.category,
+        status: initialData.status,
+        description: initialData.description || "",
+      });
+    } else {
+      setFormData({
+        title: "",
+        code: "",
+        category: "General",
+        status: "ACTIVE",
+        description: "",
+      });
+    }
+  }, [initialData, isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onAdd(formData);
     onClose();
-    setFormData({
-      title: "",
-      code: "",
-      category: "General",
-      status: "ACTIVE",
-      priority: "MEDIUM",
-      location: "",
-      description: "",
-    });
+    if (!initialData) {
+      setFormData({
+        title: "",
+        code: "",
+        category: "General",
+        status: "ACTIVE",
+        description: "",
+      });
+    }
   };
 
   return (
@@ -58,10 +77,10 @@ export function AddRecordDialog({ isOpen, onClose, onAdd }: AddRecordDialogProps
               <div className="flex justify-between items-start mb-10">
                 <div>
                   <h2 className="text-3xl font-black tracking-tighter text-slate-900 dark:text-white mb-2">
-                    Mendaftarkan Arsip
+                    {initialData ? "Edit Data Arsip" : "Mendaftarkan Arsip"}
                   </h2>
                   <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    Sistem Manajemen Presisi
+                    {initialData ? `MEMPERBARUI ID: ${initialData.id.split('-')[0].toUpperCase()}` : "Sistem Manajemen Presisi"}
                   </p>
                 </div>
                 <button 
@@ -96,7 +115,7 @@ export function AddRecordDialog({ isOpen, onClose, onAdd }: AddRecordDialogProps
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-8">
+                <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Kategori</label>
                     <select
@@ -108,19 +127,6 @@ export function AddRecordDialog({ isOpen, onClose, onAdd }: AddRecordDialogProps
                       <option value="Finance">Finance</option>
                       <option value="HR">HR</option>
                       <option value="Legal">Legal</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Prioritas</label>
-                    <select
-                      value={formData.priority}
-                      onChange={e => setFormData(p => ({ ...p, priority: e.target.value as RecordPriority }))}
-                      className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all font-medium appearance-none"
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="CRITICAL">Critical</option>
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -160,7 +166,7 @@ export function AddRecordDialog({ isOpen, onClose, onAdd }: AddRecordDialogProps
                     type="submit"
                     className="flex-1 primary-gradient px-8 py-5 rounded-3xl text-[11px] font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-95"
                   >
-                    Simpan Arsip
+                    {initialData ? "Simpan Perubahan" : "Simpan Arsip"}
                   </button>
                 </div>
               </form>

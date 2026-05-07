@@ -3,18 +3,30 @@
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSession } from "next-auth/react"
-import { LoanSession, LoanStatus } from "../locations/types"
+import { LoanStatus } from "../locations/types"
+
+export interface LoanFormData {
+  recordId: string;
+  recordTitle: string;
+  recordCode: string;
+  borrowerName: string;
+  borrowerId: string;
+  loanDate: string;
+  dueDate: string;
+  notes: string;
+}
 
 interface AddLoanDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (loan: Omit<LoanSession, "id">) => void;
+  onAdd: (loan: LoanFormData & { status: LoanStatus }) => void;
+  initialReport?: { id: string; title: string; code: string };
 }
 
-export function AddLoanDialog({ isOpen, onClose, onAdd }: AddLoanDialogProps) {
+export function AddLoanDialog({ isOpen, onClose, onAdd, initialReport }: AddLoanDialogProps) {
   const { data: session } = useSession();
   const [prevOpen, setPrevOpen] = useState(isOpen);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LoanFormData>({
     recordId: "",
     recordTitle: "",
     recordCode: "",
@@ -28,11 +40,14 @@ export function AddLoanDialog({ isOpen, onClose, onAdd }: AddLoanDialogProps) {
   // Sync state when dialog opens
   if (isOpen !== prevOpen) {
     setPrevOpen(isOpen);
-    if (isOpen && session?.user) {
+    if (isOpen) {
       setFormData(prev => ({
         ...prev,
-        borrowerName: session.user?.name || "",
-        borrowerId: (session.user as { id?: string }).id || "",
+        recordId: initialReport?.id || "",
+        recordTitle: initialReport?.title || "",
+        recordCode: initialReport?.code || "",
+        borrowerName: session?.user?.name || "",
+        borrowerId: (session?.user as { id?: string })?.id || "",
       }));
     }
   }
@@ -99,20 +114,22 @@ export function AddLoanDialog({ isOpen, onClose, onAdd }: AddLoanDialogProps) {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Judul Arsip</label>
                     <input
                       required
+                      readOnly={!!initialReport}
                       value={formData.recordTitle}
                       onChange={e => setFormData(p => ({ ...p, recordTitle: e.target.value }))}
                       placeholder="Pilih atau cari arsip..."
-                      className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 font-medium"
+                      className={`w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 font-medium ${!!initialReport ? 'opacity-70 cursor-not-allowed' : ''}`}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Kode Arsip</label>
                     <input
                       required
+                      readOnly={!!initialReport}
                       value={formData.recordCode}
                       onChange={e => setFormData(p => ({ ...p, recordCode: e.target.value }))}
                       placeholder="e.g. ADM-2024-XXX"
-                      className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 font-medium"
+                      className={`w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 font-medium ${!!initialReport ? 'opacity-70 cursor-not-allowed' : ''}`}
                     />
                   </div>
                 </div>

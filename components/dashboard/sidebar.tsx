@@ -16,6 +16,7 @@ const adminNavigation = [
   { name: "Approvals", href: "/admin/approvals", icon: "verified_user" },
   { name: "Architect", href: "/admin/architect", icon: "architecture" },
   { name: "Users", href: "/admin/users", icon: "group" },
+  { name: "Master Laporan", href: "/admin/categories", icon: "category" },
 ]
 
 export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {

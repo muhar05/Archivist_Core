@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { requestDepositAction, getSopRequirementsAction } from "@/actions/reportActions"
+import { requestDepositAction, getSopRequirementsAction, getReportCategoriesAction } from "@/actions/reportActions"
 import { useSession } from "next-auth/react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { getAssignableUnitsAction, getUnitHierarchyAction } from "@/actions/locationActions"
@@ -13,7 +13,7 @@ import { Package, Lock, Info, ClipboardCheck, FileText } from "lucide-react"
 
 interface DepositFormData {
   report_number: string;
-  title: string;
+  category_id: string;
   client: string;
   unit_id: string;
 }
@@ -25,7 +25,7 @@ export const DepositForm = () => {
   const { data: session } = useSession()
   const [formData, setFormData] = useState<DepositFormData>({
     report_number: "",
-    title: "",
+    category_id: "",
     client: "",
     unit_id: initialUnitId
   })
@@ -42,6 +42,12 @@ export const DepositForm = () => {
   const { data: sopRequirements } = useQuery({
     queryKey: ["sop-requirements"],
     queryFn: () => getSopRequirementsAction()
+  })
+
+  // Fetch Report Categories
+  const { data: categories } = useQuery({
+    queryKey: ["report-categories"],
+    queryFn: () => getReportCategoriesAction()
   })
 
   // Fetch assignable units
@@ -62,14 +68,20 @@ export const DepositForm = () => {
       const user = session?.user as { id: string }
       if (!user) throw new Error("Unauthorized")
 
+      const category = categories?.find(c => c.id === data.category_id)
+      const fullTitle = category ? `${category.name}${category.sub_category ? ` - ${category.sub_category}` : ''}` : "Unknown Report"
+      const isComplete = sopRequirements ? checklist.length === sopRequirements.length : true
+
       return requestDepositAction({
         report_number: data.report_number,
-        title: data.title,
+        category_id: data.category_id,
+        title: fullTitle,
         client: data.client,
         unit_id: data.unit_id,
         created_by: user.id,
         metadata: {
-          sop_checklist: checklist
+          sop_checklist: checklist,
+          is_sop_complete: isComplete
         }
       })
     },
@@ -90,9 +102,13 @@ export const DepositForm = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!sopRequirements || checklist.length < sopRequirements.length) {
-      return toast.error("Please complete all SOP checklist items")
+    
+    const isComplete = sopRequirements ? checklist.length === sopRequirements.length : true
+    
+    if (!isComplete) {
+      toast.info("Submitting with incomplete SOP requirements. Admin will need to verify later.")
     }
+
     mutation.mutate(formData)
   }
 
@@ -110,24 +126,28 @@ export const DepositForm = () => {
           <h3 className="text-sm font-bold uppercase tracking-widest">Report Metadata</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase">Report Number</label>
+            <label className="text-xs font-bold text-slate-500 uppercase">Jenis Laporan</label>
+            <select 
+              required
+              value={formData.category_id}
+              onChange={e => setFormData({...formData, category_id: e.target.value})}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all appearance-none"
+            >
+              <option value="" disabled>Pilih Jenis Laporan</option>
+              {categories?.map(c => (
+                <option key={c.id} value={c.id}>{c.name} {c.sub_category ? `(${c.sub_category})` : ''}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase">Nomor Laporan</label>
             <input 
               required
               value={formData.report_number}
               onChange={e => setFormData({...formData, report_number: e.target.value})}
               placeholder="e.g. REP-2024-001"
-              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label className="text-xs font-bold text-slate-500 uppercase">Report Title</label>
-            <input 
-              required
-              value={formData.title}
-              onChange={e => setFormData({...formData, title: e.target.value})}
-              placeholder="e.g. Laporan Keuangan Q1 2024"
               className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
             />
           </div>

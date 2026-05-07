@@ -22,10 +22,10 @@ export async function middleware(request: NextRequest) {
   if (token) {
     const role = (token as { role: string }).role;
 
-    // If user is logged in and trying to access login page, redirect based on role
-    if (pathname.startsWith('/auth/login')) {
+    // If user is logged in and trying to access login page or root landing page, redirect based on role
+    if (pathname.startsWith('/auth/login') || pathname === '/') {
       const url = request.nextUrl.clone();
-      url.pathname = role === 'admin' ? '/admin' : '/staff';
+      url.pathname = role === 'admin' ? '/admin/approvals' : '/staff/deposit';
       return NextResponse.redirect(url);
     }
 

@@ -13,3 +13,18 @@ export async function createUserAction(user: { full_name: string; email: string;
   revalidatePath("/admin/users");
   return newUser;
 }
+
+export async function updateUserAction(id: string, data: Partial<{ full_name: string; email: string; role: "admin" | "staff" }>) {
+  const updatedUser = await userService.updateUser(id, data);
+  revalidatePath("/admin/users");
+  return updatedUser;
+}
+
+export async function deleteUserAction(id: string) {
+  await userService.deleteUser(id);
+  revalidatePath("/admin/users");
+}
+
+export async function changePasswordAction(id: string, currentPass: string, newPass: string) {
+  return await userService.verifyAndChangePassword(id, currentPass, newPass);
+}

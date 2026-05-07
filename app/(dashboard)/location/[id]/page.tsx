@@ -1,19 +1,30 @@
 "use client"
 
 import React from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter } from "next/navigation"
 import { getUnitHierarchyAction, getStorageUnitsAction } from "@/actions/locationActions"
 import { getLockersByCabinetAction } from "@/actions/lockerActions"
-import { getReportsByUnitAction } from "@/actions/reportActions"
+import { createLoanAction } from "@/actions/loanActions"
+import { getReportsByUnitAction, confirmPlacementAction } from "@/actions/reportActions"
 import { Breadcrumbs } from "@/components/dashboard/locations/Breadcrumbs"
 import { LockerView } from "@/components/dashboard/locations/LockerView"
 import { ArchitectCanvas, CanvasUnit } from "@/components/dashboard/locations/ArchitectCanvas"
+import { AddLoanDialog, LoanFormData } from "@/components/dashboard/loans/add-loan-dialog"
+import { ReportDetailDialog } from "@/components/dashboard/records/report-detail-dialog"
 import { motion } from "framer-motion"
+import { toast } from "sonner"
+import { type Report } from "@/services/reportService"
 
 export default function LocationDetailPage() {
   const { id } = useParams()
   const router = useRouter()
+  const queryClient = useQueryClient()
+   const [isLoanOpen, setIsLoanOpen] = React.useState(false)
+  const [isViewOpen, setIsViewOpen] = React.useState(false)
+  const [selectedReportForLoan, setSelectedReportForLoan] = React.useState<{ id: string; title: string; code: string } | null>(null)
+  const [selectedReportForView, setSelectedReportForView] = React.useState<(Report & { creator?: { full_name: string } }) | null>(null)
+  const { data: session } = useQuery({ queryKey: ["session"], queryFn: () => fetch("/api/auth/session").then(res => res.json()) })
   const unitId = id as string
 
   // Fetch Hierarchy for Breadcrumbs
@@ -38,6 +49,38 @@ export default function LocationDetailPage() {
     queryKey: ["reports", unitId],
     queryFn: () => getReportsByUnitAction(unitId),
     enabled: !!unit && unit.type === "locker"
+  })
+
+  // 4. Mutation for placement confirmation
+  const placementMutation = useMutation({
+    mutationFn: (reportId: string) => {
+      const staffId = session?.user?.id
+      if (!staffId) throw new Error("Unauthorized")
+      return confirmPlacementAction(reportId, staffId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports", unitId] })
+      toast.success("Penempatan laporan berhasil dikonfirmasi")
+    },
+    onError: (error: Error) => toast.error(error.message)
+  })
+
+  // 5. Mutation for creating a loan
+  const loanMutation = useMutation({
+    mutationFn: (loanData: LoanFormData) => {
+      return createLoanAction({
+        report_id: loanData.recordId,
+        borrower_id: loanData.borrowerId,
+        due_date: new Date(loanData.dueDate),
+        notes: loanData.notes
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports", unitId] })
+      toast.success("Peminjaman berhasil didaftarkan")
+      setIsLoanOpen(false)
+    },
+    onError: (error: Error) => toast.error(error.message)
   })
 
 
@@ -102,6 +145,25 @@ export default function LocationDetailPage() {
             reports={reports || []} 
             unitName={unit.data.name} 
             onDeposit={() => router.push(`/staff/deposit?unitId=${unitId}`)}
+            onConfirmPlacement={(reportId) => placementMutation.mutate(reportId)}
+            onLoan={(reportId) => {
+              const report = reports?.find(r => r.id === reportId)
+              if (report) {
+                setSelectedReportForLoan({
+                  id: report.id,
+                  title: report.title,
+                  code: report.report_number
+                })
+                setIsLoanOpen(true)
+              }
+            }}
+            onView={(reportId) => {
+              const report = reports?.find(r => r.id === reportId)
+              if (report) {
+                setSelectedReportForView(report)
+                setIsViewOpen(true)
+              }
+            }}
           />
         ) : (
           <div className="flex flex-col gap-4">
@@ -129,6 +191,19 @@ export default function LocationDetailPage() {
           </div>
         )}
       </motion.div>
+
+      <AddLoanDialog 
+        isOpen={isLoanOpen} 
+        onClose={() => setIsLoanOpen(false)} 
+        initialReport={selectedReportForLoan || undefined}
+        onAdd={(data) => loanMutation.mutate(data)}
+      />
+
+      <ReportDetailDialog 
+        isOpen={isViewOpen}
+        onClose={() => setIsViewOpen(false)}
+        report={selectedReportForView}
+      />
     </div>
   )
 }

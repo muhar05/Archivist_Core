@@ -11,7 +11,7 @@ async function main() {
 
   // 1. Clean existing data (optional but safer for dev)
   console.log("🧹 Cleaning old data...");
-  await db.execute(sql`TRUNCATE TABLE ${schema.profiles}, ${schema.rooms}, ${schema.storageUnits}, ${schema.lockers}, ${schema.reports}, ${schema.reportLogs}, ${schema.loans}, ${schema.sopRequirements} CASCADE`);
+  await db.execute(sql`TRUNCATE TABLE ${schema.profiles}, ${schema.rooms}, ${schema.storageUnits}, ${schema.lockers}, ${schema.reports}, ${schema.reportLogs}, ${schema.loans}, ${schema.sopRequirements}, ${schema.reportCategories} CASCADE`);
 
   // 2. Profiles
   console.log("👤 Seeding profiles...");
@@ -24,6 +24,7 @@ async function main() {
   await db.insert(schema.profiles).values([
     {
       id: adminId,
+      employee_id: "ADM-001",
       full_name: "Admin Archivist",
       email: "admin@prms.local",
       password: adminPassword,
@@ -31,6 +32,7 @@ async function main() {
     },
     {
       id: staffId,
+      employee_id: "STF-001",
       full_name: "Staff Operator",
       email: "staff@prms.local",
       password: staffPassword,
@@ -132,7 +134,16 @@ async function main() {
     },
   ]);
 
-  // 6. SOP Requirements
+  // 6. Report Categories
+  console.log("📂 Seeding report categories...");
+  await db.insert(schema.reportCategories).values([
+    { name: "Laporan Penilaian", sub_category: "Asset", description: "Laporan terkait penilaian aset fisik." },
+    { name: "Laporan Penilaian", sub_category: "Bisnis", description: "Laporan terkait penilaian entitas bisnis." },
+    { name: "Laporan Pengawasan", sub_category: "Internal", description: "Laporan hasil pengawasan internal." },
+    { name: "Laporan Pengawasan", sub_category: "Eksternal", description: "Laporan hasil pengawasan pihak luar." },
+  ]);
+
+  // 7. SOP Requirements
   console.log("📋 Seeding SOP requirements...");
   await db.insert(schema.sopRequirements).values([
     { name: "Narasi", description: "Dokumen narasi laporan lengkap." },

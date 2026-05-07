@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { reports, reportLogs, sopRequirements, lockers } from "@/db/schema";
-import { eq, desc, ilike, or } from "drizzle-orm";
+import { reports, reportLogs, sopRequirements, lockers, reportCategories } from "@/db/schema";
+import { eq, desc, ilike, or, asc } from "drizzle-orm";
 
 export type Report = typeof reports.$inferSelect;
 export type ReportInsert = typeof reports.$inferInsert;
@@ -24,7 +24,12 @@ export const reportService = {
       where: or(eq(reports.unit_id, unit_id), eq(reports.locker_id, unit_id)),
       orderBy: [desc(reports.created_at)],
       with: {
-        creator: true
+        creator: true,
+        unit: {
+          with: {
+            room: true
+          }
+        }
       }
     });
   },
@@ -86,34 +91,58 @@ export const reportService = {
     });
   },
 
-  async approveReport(report_id: string, admin_id: string) {
-    // 1. Update status
+  async approveReport(report_id: string, admin_id: string, notes?: string) {
+    // 1. Get current metadata
+    const currentReport = await db.query.reports.findFirst({
+      where: eq(reports.id, report_id)
+    });
+
+    // 2. Update status and metadata
     const [updatedReport] = await db
       .update(reports)
-      .set({ status: "pending_placement" })
+      .set({ 
+        status: "pending_placement",
+        metadata: {
+          ...(currentReport?.metadata as object || {}),
+          admin_notes: notes || "Verified by Admin",
+          verified_at: new Date().toISOString()
+        }
+      })
       .where(eq(reports.id, report_id))
       .returning();
 
-    // 2. Create Log
+    // 3. Create Log
     await db.insert(reportLogs).values({
       report_id: report_id,
       action: "APPROVE",
       from_user_id: admin_id,
-      notes: "Physical verification completed by Admin. Awaiting staff placement confirmation."
+      notes: notes || "Physical verification completed by Admin. Awaiting staff placement confirmation."
     });
 
     return updatedReport;
   },
 
   async rejectReport(report_id: string, admin_id: string, reason: string) {
-    // 1. Update status
+    // 1. Get current metadata
+    const currentReport = await db.query.reports.findFirst({
+      where: eq(reports.id, report_id)
+    });
+
+    // 2. Update status and metadata
     const [updatedReport] = await db
       .update(reports)
-      .set({ status: "rejected" })
+      .set({ 
+        status: "rejected",
+        metadata: {
+          ...(currentReport?.metadata as object || {}),
+          rejection_reason: reason,
+          rejected_at: new Date().toISOString()
+        }
+      })
       .where(eq(reports.id, report_id))
       .returning();
 
-    // 2. Create Log
+    // 3. Create Log
     await db.insert(reportLogs).values({
       report_id: report_id,
       action: "REJECT",
@@ -160,6 +189,19 @@ export const reportService = {
     return updatedReport;
   },
 
+  async updateReport(id: string, data: Partial<Report>) {
+    const [updatedReport] = await db
+      .update(reports)
+      .set(data)
+      .where(eq(reports.id, id))
+      .returning();
+    return updatedReport;
+  },
+
+  async deleteReport(id: string) {
+    return await db.delete(reports).where(eq(reports.id, id));
+  },
+
   async getReportsByStaff(staff_id: string) {
     return await db.query.reports.findMany({
       where: eq(reports.created_by, staff_id),
@@ -176,5 +218,20 @@ export const reportService = {
     return await db.query.sopRequirements.findMany({
       orderBy: [desc(sopRequirements.created_at)]
     });
+  },
+
+  async getReportCategories() {
+    return await db.query.reportCategories.findMany({
+      orderBy: [asc(reportCategories.name)]
+    });
+  },
+
+  async createCategory(data: { name: string; sub_category?: string; description?: string }) {
+    const [newCategory] = await db.insert(reportCategories).values(data).returning();
+    return newCategory;
+  },
+
+  async deleteCategory(id: string) {
+    return await db.delete(reportCategories).where(eq(reportCategories.id, id));
   }
 };

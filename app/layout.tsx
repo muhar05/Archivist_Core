@@ -39,7 +39,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} ${inter.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} ${inter.variable} dark h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
@@ -49,7 +50,7 @@ export default function RootLayout({
         />
       </head>
 
-      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <QueryProvider>
           <ThemeProvider>
             {children}

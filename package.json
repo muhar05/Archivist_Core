@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "seed": "tsx db/seed.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

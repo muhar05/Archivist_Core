@@ -7,7 +7,18 @@ import { getRoomsAction, setRoomMaintenanceAction } from "@/actions/locationActi
 import { getSOPRequirementsAction } from "@/actions/sopActions"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
-import { ShieldCheck, Check, Info, FileText } from "lucide-react"
+import { ShieldCheck, Check, FileText, MessageSquare, AlertTriangle, XCircle, AlertCircle } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogMedia,
+} from "@/components/ui/alert-dialog"
 
 interface Report {
   id: string;
@@ -23,6 +34,12 @@ interface Report {
       name: string 
     } | null;
   } | null;
+  metadata?: {
+    is_sop_complete?: boolean;
+    sop_checklist?: string[];
+    rejection_reason?: string;
+    admin_notes?: string;
+  };
 }
 
 interface Room {
@@ -63,6 +80,11 @@ export default function ApprovalsPage() {
 
   // State to track checked SOPs per report
   const [verifications, setVerifications] = useState<Record<string, string[]>>({})
+  const [adminNotes, setAdminNotes] = useState<Record<string, string>>({})
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingApprovalId, setPendingApprovalId] = useState<string | null>(null)
+  const [isRejecting, setIsRejecting] = useState(false)
+  const [rejectReason, setRejectReason] = useState("")
 
   const toggleSOP = (reportId: string, sopId: string) => {
     setVerifications(prev => {
@@ -84,16 +106,36 @@ export default function ApprovalsPage() {
   const approveMutation = useMutation({
     mutationFn: async (reportId: string) => {
       if (!session?.user) throw new Error("Unauthorized")
-      if (!isAllSOPChecked(reportId)) throw new Error("Please complete all SOP checks first")
       const userId = (session.user as { id: string }).id
-      return approveReportAction(reportId, userId)
+      const notes = adminNotes[reportId]
+      return approveReportAction(reportId, userId, notes)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] })
+      setConfirmOpen(false)
+      setPendingApprovalId(null)
       toast.success("Report successfully verified and moved to pending placement")
     },
     onError: (error: Error) => toast.error(error.message)
   })
+
+  const handleApproveClick = (reportId: string) => {
+    const isReady = isAllSOPChecked(reportId)
+    if (!isReady) {
+      setPendingApprovalId(reportId)
+      setIsRejecting(false)
+      setConfirmOpen(true)
+    } else {
+      approveMutation.mutate(reportId)
+    }
+  }
+
+  const handleRejectClick = (reportId: string) => {
+    setPendingApprovalId(reportId)
+    setIsRejecting(true)
+    setRejectReason("")
+    setConfirmOpen(true)
+  }
 
   const rejectMutation = useMutation({
     mutationFn: async ({ reportId, reason }: { reportId: string; reason: string }) => {
@@ -103,6 +145,8 @@ export default function ApprovalsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] })
+      setConfirmOpen(false)
+      setPendingApprovalId(null)
       toast.success("Report request rejected")
     },
     onError: (error: Error) => toast.error(error.message)
@@ -173,10 +217,7 @@ export default function ApprovalsPage() {
                         
                         <div className="flex items-center gap-3">
                           <button 
-                            onClick={() => {
-                              const reason = window.prompt("Alasan penolakan:")
-                              if (reason) rejectMutation.mutate({ reportId: report.id, reason })
-                            }}
+                            onClick={() => handleRejectClick(report.id)}
                             disabled={rejectMutation.isPending || approveMutation.isPending}
                             className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 transition-all"
                           >
@@ -184,17 +225,33 @@ export default function ApprovalsPage() {
                           </button>
                           
                           <button 
-                            onClick={() => approveMutation.mutate(report.id)}
-                            disabled={approveMutation.isPending || !isReady}
+                            onClick={() => handleApproveClick(report.id)}
+                            disabled={approveMutation.isPending}
                             className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
                               isReady 
                                 ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95" 
-                                : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50"
+                                : "bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95"
                             }`}
                           >
-                            {approveMutation.isPending ? "Approving..." : "Verify & Approve"}
+                            {approveMutation.isPending && pendingApprovalId === report.id ? "Approving..." : isReady ? "Verify & Approve" : "Force Approve"}
                           </button>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Admin Notes Input */}
+                    <div className="bg-slate-950/30 p-6 border-t border-white/5">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="w-3 h-3 text-blue-400" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Admin Internal Notes / Instructions</span>
+                        </div>
+                        <textarea 
+                          placeholder="Tambahkan catatan khusus jika ada (misal: dokumen kurang stempel tapi tetap approve, atau instruksi perbaikan untuk staff)..."
+                          className="w-full bg-slate-900 border border-white/5 rounded-xl p-3 text-xs text-slate-300 outline-none focus:border-blue-500/50 transition-all resize-none h-20"
+                          value={adminNotes[report.id] || ""}
+                          onChange={(e) => setAdminNotes(prev => ({ ...prev, [report.id]: e.target.value }))}
+                        />
                       </div>
                     </div>
 
@@ -230,8 +287,8 @@ export default function ApprovalsPage() {
                       
                       {!isReady && sopRequirements && sopRequirements.length > 0 && (
                         <p className="mt-4 text-[10px] text-amber-500/70 italic flex items-center gap-2">
-                          <Info className="w-3 h-3" />
-                          All physical documents must be verified before this report can be officially archived.
+                          <AlertTriangle className="w-3 h-3" />
+                          Beberapa item fisik belum terverifikasi. Anda tetap bisa melakukan approve jika diperlukan.
                         </p>
                       )}
                     </div>
@@ -280,6 +337,67 @@ export default function ApprovalsPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="bg-slate-950 border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogMedia className={isRejecting ? "bg-rose-500/10" : "bg-blue-500/10"}>
+              {isRejecting ? (
+                <XCircle className="w-6 h-6 text-rose-500" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-blue-500" />
+              )}
+            </AlertDialogMedia>
+            <AlertDialogTitle className="text-white font-black uppercase tracking-tight italic">
+              {isRejecting ? "Reject Request?" : "Force Approval?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              {isRejecting 
+                ? "Harap berikan alasan penolakan agar staff dapat melakukan perbaikan yang diperlukan."
+                : "Dokumen fisik belum sepenuhnya terverifikasi sesuai SOP. Apakah Anda yakin ingin melanjutkan proses pengarsipan?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {isRejecting && (
+            <div className="py-2">
+              <textarea
+                placeholder="Tulis alasan penolakan di sini..."
+                className="w-full bg-slate-900 border border-white/5 rounded-xl p-3 text-xs text-slate-300 outline-none focus:border-rose-500/50 transition-all resize-none h-24"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/5 text-slate-500 hover:bg-white/5 hover:text-white rounded-xl">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingApprovalId) {
+                  if (isRejecting) {
+                    if (!rejectReason.trim()) {
+                      toast.error("Alasan penolakan wajib diisi")
+                      return
+                    }
+                    rejectMutation.mutate({ reportId: pendingApprovalId, reason: rejectReason })
+                  } else {
+                    approveMutation.mutate(pendingApprovalId)
+                  }
+                }
+              }}
+              className={`rounded-xl font-bold uppercase tracking-widest text-[10px] ${
+                isRejecting ? "bg-rose-600 hover:bg-rose-500" : "bg-blue-600 hover:bg-blue-500"
+              }`}
+            >
+              {isRejecting ? "Reject Request" : "Continue Approval"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

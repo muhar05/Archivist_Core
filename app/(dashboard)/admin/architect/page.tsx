@@ -184,8 +184,8 @@ export default function ArchitectPage() {
     }
   })
 
-  const updateRoomMutation = useMutation({
-    mutationFn: (updates: { id: string; grid_width?: number; grid_height?: number; width_cm?: number; height_cm?: number }) => updateRoomAction(updates.id, updates),
+   const updateRoomMutation = useMutation({
+    mutationFn: (updates: { id: string; grid_width?: number; grid_height?: number; width_cm?: number; height_cm?: number; ceiling_height_cm?: number }) => updateRoomAction(updates.id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] })
       toast.success("Room configuration updated")
@@ -812,6 +812,7 @@ export default function ArchitectPage() {
                   gridHeight={rooms?.find(r => r.id === selectedRoomId)?.grid_height || 50}
                   roomWidthCm={rooms?.find(r => r.id === selectedRoomId)?.width_cm || 1500}
                   roomHeightCm={rooms?.find(r => r.id === selectedRoomId)?.height_cm || 1000}
+                  ceilingHeight={rooms?.find(r => r.id === selectedRoomId)?.ceiling_height_cm || 300}
                   readOnly={isLocked}
                 />
               </motion.div>
@@ -833,6 +834,7 @@ export default function ArchitectPage() {
                     gridHeight={25}
                     roomWidthCm={selectedUnit?.internal_width || 200}
                     roomHeightCm={selectedUnit?.internal_height || 200}
+                    ceilingHeight={selectedUnit?.height || 200}
                     readOnly={isLocked}
                     isElevationMode={true}
                     backgroundLabel={`INSIDE: ${selectedUnit?.name}`}
@@ -1145,10 +1147,11 @@ export default function ArchitectPage() {
                             type="number"
                             value={selectedSubUnit ? selectedSubUnit.x : (selectedUnit?.x || 0)}
                             onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
                               if (selectedSubUnit) handleSubUnitMove(selectedSubUnit.id, val, selectedSubUnit.y)
                               else if (selectedUnit) handleUnitMove(selectedUnit.id, val, selectedUnit.y)
                             }}
+                            min="0"
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
                           />
                         </div>
@@ -1160,28 +1163,40 @@ export default function ArchitectPage() {
                             type="number"
                             value={selectedSubUnit ? selectedSubUnit.y : (selectedUnit?.y || 0)}
                             onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
                               if (selectedSubUnit) handleSubUnitMove(selectedSubUnit.id, selectedSubUnit.x, val)
                               else if (selectedUnit) handleUnitMove(selectedUnit.id, selectedUnit.x, val)
                             }}
+                            min="0"
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono"
                           />
                         </div>
-                        {viewMode === 'GRID' && (
                           <div>
                             <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Z Elevation</label>
-                            <input 
-                              type="number"
-                              value={(selectedSubUnit ? (selectedSubUnit as unknown as CanvasUnit).z : (selectedUnit?.z || 0)) || 0}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                if (selectedSubUnit) setLocalSubUnits(prev => prev.map(u => u.id === selectedSubUnit.id ? { ...u, z: val } : u))
-                                else if (selectedUnit) handleUnitElevation(selectedUnit.id, val)
-                              }}
-                              className="w-full bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-2 text-sm text-amber-500 outline-none focus:border-amber-500 font-mono"
-                            />
+                            <div className="flex gap-2">
+                              <input 
+                                type="number"
+                                value={(selectedSubUnit ? (selectedSubUnit as unknown as CanvasUnit).z : (selectedUnit?.z || 0)) || 0}
+                                onChange={(e) => {
+                                  const val = Math.max(0, parseInt(e.target.value) || 0);
+                                  if (selectedSubUnit) setLocalSubUnits(prev => prev.map(u => u.id === selectedSubUnit.id ? { ...u, z: val } : u))
+                                  else if (selectedUnit) handleUnitElevation(selectedUnit.id, val)
+                                }}
+                                min="0"
+                                className="flex-1 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-2 text-sm text-amber-500 outline-none focus:border-amber-500 font-mono"
+                              />
+                              <button 
+                                onClick={() => {
+                                  if (selectedSubUnit) setLocalSubUnits(prev => prev.map(u => u.id === selectedSubUnit.id ? { ...u, z: 0 } : u))
+                                  else if (selectedUnit) handleUnitElevation(selectedUnit.id, 0)
+                                }}
+                                title="Snap to Floor"
+                                className="px-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-amber-500 hover:border-amber-500/50 transition-all flex items-center justify-center"
+                              >
+                                <span className="material-symbols-outlined text-sm">vertical_align_bottom</span>
+                              </button>
+                            </div>
                           </div>
-                        )}
                       </div>
                     )}
                     {/* Only show Dimension inputs in GRID mode, OR in ELEVATION mode if a locker is selected */}
@@ -1412,10 +1427,69 @@ export default function ArchitectPage() {
                     </div>
                   </motion.div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                    <h3 className="text-slate-400 font-bold">No Unit Selected</h3>
-                    <p className="text-[10px] text-slate-600 uppercase tracking-widest mt-1">Select a unit on canvas to edit properties</p>
-                  </div>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-10"
+                  >
+                    {/* Room Global Settings */}
+                    <div className="space-y-6">
+                       <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                            <Settings2 className="w-4 h-4 text-blue-500" />
+                          </div>
+                          <h3 className="text-sm font-black uppercase tracking-widest text-white">Room Settings</h3>
+                       </div>
+
+                       <div className="space-y-4 p-6 bg-slate-800/40 rounded-3xl border border-white/5">
+                          <div className="space-y-4">
+                             <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ceiling Height</label>
+                                <span className="text-[10px] font-mono text-blue-400 font-bold">{rooms?.find(r => r.id === selectedRoomId)?.ceiling_height_cm || 300}cm</span>
+                             </div>
+                             <input 
+                               type="range"
+                               min="100"
+                               max="1000"
+                               step="10"
+                               value={rooms?.find(r => r.id === selectedRoomId)?.ceiling_height_cm || 300}
+                               onChange={(e) => {
+                                 const val = parseInt(e.target.value);
+                                 updateRoomMutation.mutate({ id: selectedRoomId!, ceiling_height_cm: val });
+                               }}
+                               className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                             />
+                             <div className="flex justify-between text-[8px] text-slate-600 font-bold uppercase tracking-tighter">
+                                <span>Low (1m)</span>
+                                <span>High (10m)</span>
+                             </div>
+                          </div>
+                       </div>
+
+                       <div className="p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10">
+                          <p className="text-[9px] text-amber-400/80 leading-relaxed italic">
+                            Adjusting the ceiling height will affect the 3D visualization for all units in this room.
+                          </p>
+                       </div>
+                    </div>
+
+                    <div className="h-px bg-white/5 w-full" />
+
+                    {/* Stats */}
+                    <div className="space-y-4">
+                       <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Facility Stats</h3>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-slate-800/40 rounded-2xl border border-white/5">
+                             <div className="text-xl font-black text-white">{localUnits.length}</div>
+                             <div className="text-[8px] text-slate-500 uppercase font-bold tracking-widest mt-1">Total Units</div>
+                          </div>
+                          <div className="p-4 bg-slate-800/40 rounded-2xl border border-white/5">
+                             <div className="text-xl font-black text-white">{localUnits.filter(u => u.unit_type === 'DOOR').length}</div>
+                             <div className="text-[8px] text-slate-500 uppercase font-bold tracking-widest mt-1">Doors</div>
+                          </div>
+                       </div>
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             ) : (

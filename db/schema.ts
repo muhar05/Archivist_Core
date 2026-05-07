@@ -10,6 +10,7 @@ export const loanStatusEnum = pgEnum("loan_status", ["ONGOING", "RETURNED", "OVE
 // Profiles
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
+  employee_id: text("employee_id").unique(), // NIP / Employee ID
   full_name: text("full_name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
@@ -75,11 +76,19 @@ export const lockers = pgTable("lockers", {
 });
 
 
-// Reports
+// Report Categories (Master data defined by Admin)
+export const reportCategories = pgTable("report_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(), // e.g., "Laporan Penilaian"
+  sub_category: text("sub_category"), // e.g., "Asset", "Bisnis"
+  description: text("description"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
 export const reports = pgTable("reports", {
   id: uuid("id").primaryKey().defaultRandom(),
-  unit_id: uuid("unit_id").references(() => storageUnits.id, { onDelete: "cascade" }), // Unit ruangan (opsional jika sudah ada locker)
-  locker_id: uuid("locker_id").references(() => lockers.id, { onDelete: "cascade" }), // Laci spesifik
+  unit_id: uuid("unit_id").references(() => storageUnits.id, { onDelete: "cascade" }), 
+  locker_id: uuid("locker_id").references(() => lockers.id, { onDelete: "cascade" }), 
+  category_id: uuid("category_id").references(() => reportCategories.id),
   report_number: text("report_number").notNull(), // Nomor Laporan
   report_date: timestamp("report_date").defaultNow().notNull(), // Tanggal Laporan
   title: text("title").notNull(),
@@ -147,6 +156,7 @@ export const lockersRelations = relations(lockers, ({ one, many }) => ({
 export const reportsRelations = relations(reports, ({ one, many }) => ({
   unit: one(storageUnits, { fields: [reports.unit_id], references: [storageUnits.id] }),
   locker: one(lockers, { fields: [reports.locker_id], references: [lockers.id] }),
+  category: one(reportCategories, { fields: [reports.category_id], references: [reportCategories.id] }),
   creator: one(profiles, { fields: [reports.created_by], references: [profiles.id], relationName: "creator" }),
   holder: one(profiles, { fields: [reports.current_holder_id], references: [profiles.id], relationName: "holder" }),
   logs: many(reportLogs),
