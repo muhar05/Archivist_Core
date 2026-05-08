@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
 
   // 1. Unauthenticated users handling
   if (!token) {
-    const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/staff') || (pathname === '/');
+    const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/staff') || pathname.startsWith('/dashboard') || pathname.startsWith('/records') || pathname.startsWith('/locations') || pathname.startsWith('/loans');
     
     // Check if it's NOT the login page to avoid infinite redirect
     if (isProtectedRoute && !pathname.startsWith('/auth/login')) {
@@ -22,8 +22,8 @@ export async function middleware(request: NextRequest) {
   if (token) {
     const role = (token as { role: string }).role;
 
-    // If user is logged in and trying to access login page or root landing page, redirect based on role
-    if (pathname.startsWith('/auth/login') || pathname === '/') {
+    // Only redirect if they are trying to access the login page while already logged in
+    if (pathname.startsWith('/auth/login')) {
       const url = request.nextUrl.clone();
       url.pathname = role === 'admin' ? '/admin/approvals' : '/staff/deposit';
       return NextResponse.redirect(url);
