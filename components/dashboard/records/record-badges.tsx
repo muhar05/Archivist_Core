@@ -9,11 +9,11 @@ interface RecordStatusBadgeProps {
 
 export function RecordStatusBadge({ status }: RecordStatusBadgeProps) {
   const styles = {
-    ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-500/20",
-    BORROWED: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-500/20",
-    ARCHIVED: "bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border-slate-500/20",
+    ARCHIVED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-500/20",
+    BORROWED: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border-blue-500/20",
+    ACTIVE: "bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border-slate-500/20",
     DISPOSED: "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border-rose-500/20",
-    PENDING: "bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 border-sky-500/20",
+    PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-500/20",
   }[status];
 
   return (

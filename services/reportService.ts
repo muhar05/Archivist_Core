@@ -4,6 +4,7 @@ import { eq, desc, ilike, or, asc } from "drizzle-orm";
 
 export type Report = typeof reports.$inferSelect;
 export type ReportInsert = typeof reports.$inferInsert;
+export type ReportCategory = typeof reportCategories.$inferSelect;
 
 export const reportService = {
   async getAllReports() {
@@ -11,6 +12,7 @@ export const reportService = {
       orderBy: [desc(reports.created_at)],
       with: {
         creator: true,
+        category: true,
         unit: {
           with: {
             room: true
@@ -25,6 +27,7 @@ export const reportService = {
       orderBy: [desc(reports.created_at)],
       with: {
         creator: true,
+        category: true,
         unit: {
           with: {
             room: true
@@ -82,6 +85,7 @@ export const reportService = {
       orderBy: [desc(reports.created_at)],
       with: {
         creator: true,
+        category: true,
         unit: {
           with: {
             room: true
@@ -207,6 +211,7 @@ export const reportService = {
       where: eq(reports.created_by, staff_id),
       orderBy: [desc(reports.created_at)],
       with: {
+        category: true,
         unit: {
           with: { room: true }
         }

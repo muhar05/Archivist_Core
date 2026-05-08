@@ -10,7 +10,8 @@ export interface LoanFormData {
   recordTitle: string;
   recordCode: string;
   borrowerName: string;
-  borrowerId: string;
+  borrowerId: string; // This will hold the Display ID (Employee ID)
+  borrowerUuid: string; // This will hold the actual UUID for DB
   loanDate: string;
   dueDate: string;
   notes: string;
@@ -32,6 +33,7 @@ export function AddLoanDialog({ isOpen, onClose, onAdd, initialReport }: AddLoan
     recordCode: "",
     borrowerName: "",
     borrowerId: "",
+    borrowerUuid: "",
     loanDate: new Date().toISOString().split('T')[0],
     dueDate: "",
     notes: "",
@@ -47,7 +49,8 @@ export function AddLoanDialog({ isOpen, onClose, onAdd, initialReport }: AddLoan
         recordTitle: initialReport?.title || "",
         recordCode: initialReport?.code || "",
         borrowerName: session?.user?.name || "",
-        borrowerId: (session?.user as { id?: string })?.id || "",
+        borrowerId: (session?.user as { employee_id?: string | null })?.employee_id || (session?.user as { id?: string })?.id || "",
+        borrowerUuid: (session?.user as { id?: string })?.id || "",
       }));
     }
   }
@@ -65,6 +68,7 @@ export function AddLoanDialog({ isOpen, onClose, onAdd, initialReport }: AddLoan
       recordCode: "",
       borrowerName: "",
       borrowerId: "",
+      borrowerUuid: "",
       loanDate: new Date().toISOString().split('T')[0],
       dueDate: "",
       notes: "",

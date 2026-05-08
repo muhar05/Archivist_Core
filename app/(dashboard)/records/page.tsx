@@ -4,14 +4,14 @@ import React, { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useSession } from "next-auth/react"
-import { getAllReportsAction, deleteReportAction, updateReportAction, createReportAction } from "@/actions/reportActions"
+import { getAllReportsAction, deleteReportAction, updateReportAction, createReportAction, getReportCategoriesAction } from "@/actions/reportActions"
 import { RecordTable } from "@/components/dashboard/records/record-table"
 import { AddRecordDialog } from "@/components/dashboard/records/add-record-dialog"
 import { ReportDetailDialog } from "@/components/dashboard/records/report-detail-dialog"
 import { RecordStatus, RecordPriority, ArchivalRecord } from "@/components/dashboard/locations/types"
 import { toast } from "sonner"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { type Report } from "@/services/reportService"
+import { type Report, type ReportCategory } from "@/services/reportService"
 
 export default function RecordsPage() {
   const queryClient = useQueryClient();
@@ -25,18 +25,23 @@ export default function RecordsPage() {
   const isAdmin = session?.user?.role === "admin";
 
   // Fetch real data from database
-  const { data: rawReports, isLoading } = useQuery({
+  const { data: rawReports, isLoading: isReportsLoading } = useQuery({
     queryKey: ["reports", "all"],
     queryFn: () => getAllReportsAction()
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ["report-categories"],
+    queryFn: () => getReportCategoriesAction()
+  });
+
   // Transform database reports to UI-friendly format
-  const reports = (rawReports || []).map((r) => ({
+  const reports = (rawReports || []).map((r: Report & { category: ReportCategory | null, unit: { name: string, room: { name: string } | null } | null }) => ({
     id: r.id,
     title: r.title,
     code: r.report_number || r.id.split("-")[0].toUpperCase(),
-    category: "General",
-    status: (r.status === "archived" ? "ACTIVE" : r.status === "loaned" ? "BORROWED" : r.status === "pending" ? "PENDING" : "ARCHIVED") as RecordStatus,
+    category: r.category ? `${r.category.name}${r.category.sub_category ? ` - ${r.category.sub_category}` : ''}` : "General",
+    status: (r.status === "archived" ? "ARCHIVED" : r.status === "loaned" ? "BORROWED" : "PENDING") as RecordStatus,
     priority: "MEDIUM" as RecordPriority,
     location: r.unit ? `${r.unit.room?.name || "Room"} - ${r.unit.name}` : "Unknown",
     registeredAt: new Date(r.created_at).toISOString().split('T')[0],
@@ -54,7 +59,7 @@ export default function RecordsPage() {
   });
 
   const upsertMutation = useMutation({
-    mutationFn: (data: { title: string; code: string; status: RecordStatus; description: string }) => {
+    mutationFn: (data: { title: string; code: string; status: RecordStatus; description: string; category_id?: string }) => {
       const userId = session?.user?.id;
       
       const statusMap: Record<string, string> = {
@@ -70,6 +75,7 @@ export default function RecordsPage() {
         return updateReportAction(selectedRecord.id, {
           title: data.title,
           report_number: data.code,
+          category_id: data.category_id,
           status: dbStatus,
           description: data.description
         });
@@ -82,6 +88,7 @@ export default function RecordsPage() {
       return createReportAction({
         title: data.title,
         report_number: data.code,
+        category_id: data.category_id,
         status: dbStatus,
         description: data.description,
         client: "Internal",
@@ -99,12 +106,12 @@ export default function RecordsPage() {
 
   const stats = [
     { label: "Total Arsip", value: reports.length, icon: "inventory_2", color: "text-primary bg-primary/10" },
-    { label: "Sedang Dipinjam", value: reports.filter(r => r.status === "BORROWED").length, icon: "output", color: "text-amber-500 bg-amber-500/10" },
-    { label: "Pending", value: reports.filter(r => r.status === "PENDING").length, icon: "pending", color: "text-rose-500 bg-rose-500/10" },
-    { label: "Archived", value: reports.filter(r => r.status === "ACTIVE").length, icon: "verified", color: "text-emerald-500 bg-emerald-500/10" },
+    { label: "Sedang Dipinjam", value: reports.filter(r => r.status === "BORROWED").length, icon: "output", color: "text-blue-500 bg-blue-500/10" },
+    { label: "Pending", value: reports.filter(r => r.status === "PENDING").length, icon: "pending", color: "text-amber-500 bg-amber-500/10" },
+    { label: "Archived", value: reports.filter(r => r.status === "ARCHIVED").length, icon: "verified", color: "text-emerald-500 bg-emerald-500/10" },
   ];
 
-  if (isLoading) {
+  if (isReportsLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -127,18 +134,6 @@ export default function RecordsPage() {
           </h1>
         </div>
 
-        {isAdmin && (
-          <button 
-            onClick={() => {
-              setSelectedRecord(null);
-              setIsAddOpen(true);
-            }}
-            className="flex items-center gap-3 primary-gradient px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-all scale-100 active:scale-95"
-          >
-            <span className="material-symbols-outlined text-lg">add_box</span>
-            Pendaftaran Arsip Baru
-          </button>
-        )}
       </div>
 
       {/* Stats Grid */}
@@ -206,6 +201,7 @@ export default function RecordsPage() {
           setSelectedRecord(null);
         }} 
         initialData={selectedRecord}
+        categories={categories || []}
         onAdd={(data) => upsertMutation.mutate(data)} 
       />
 
@@ -219,12 +215,16 @@ export default function RecordsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Arsip Digital?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tindakan ini tidak dapat dibatalkan. Menghapus data arsip ini akan menghilangkan catatan digital dari sistem secara permanen.
-              <div className="mt-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-white/5">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Arsip yang akan dihapus:</p>
-                <p className="text-sm font-black text-white">{selectedRecord?.title}</p>
-                <p className="text-[10px] text-slate-500 font-mono">{selectedRecord?.code}</p>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-4">
+                  Tindakan ini tidak dapat dibatalkan. Menghapus data arsip ini akan menghilangkan catatan digital dari sistem secara permanen.
+                </p>
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Arsip yang akan dihapus:</p>
+                  <p className="text-sm font-black text-white">{selectedRecord?.title}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">{selectedRecord?.code}</p>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

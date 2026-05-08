@@ -3,29 +3,35 @@
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArchivalRecord, RecordStatus } from "../locations/types"
+import { ReportCategory } from "@/services/reportService"
 
 interface AddRecordDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: { title: string; code: string; status: RecordStatus; description: string; category: string }) => void;
+  categories: ReportCategory[];
+  onAdd: (data: { title: string; code: string; status: RecordStatus; description: string; category_id: string }) => void;
   initialData?: ArchivalRecord | null;
 }
 
-export function AddRecordDialog({ isOpen, onClose, onAdd, initialData }: AddRecordDialogProps) {
+export function AddRecordDialog({ isOpen, onClose, onAdd, initialData, categories }: AddRecordDialogProps) {
   const [formData, setFormData] = useState({
     title: "",
     code: "",
-    category: "General",
+    category_id: "",
     status: "ACTIVE" as RecordStatus,
     description: "",
   });
 
   React.useEffect(() => {
     if (initialData) {
+      // Find category_id based on category name if possible, 
+      // though ArchivalRecord in types might need update or we handle by name mapping
+      const category = categories.find((c: ReportCategory) => `${c.name}${c.sub_category ? ` - ${c.sub_category}` : ''}` === initialData.category);
+      
       setFormData({
         title: initialData.title,
         code: initialData.code,
-        category: initialData.category,
+        category_id: category?.id || "",
         status: initialData.status,
         description: initialData.description || "",
       });
@@ -33,12 +39,23 @@ export function AddRecordDialog({ isOpen, onClose, onAdd, initialData }: AddReco
       setFormData({
         title: "",
         code: "",
-        category: "General",
+        category_id: "",
         status: "ACTIVE",
         description: "",
       });
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, categories]);
+
+  const handleCategoryChange = (categoryId: string) => {
+    const category = categories.find((c: ReportCategory) => c.id === categoryId);
+    const generatedTitle = category ? `${category.name}${category.sub_category ? ` - ${category.sub_category}` : ''}` : "";
+    
+    setFormData(prev => ({
+      ...prev,
+      category_id: categoryId,
+      title: generatedTitle
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +65,7 @@ export function AddRecordDialog({ isOpen, onClose, onAdd, initialData }: AddReco
       setFormData({
         title: "",
         code: "",
-        category: "General",
+        category_id: "",
         status: "ACTIVE",
         description: "",
       });
@@ -97,10 +114,10 @@ export function AddRecordDialog({ isOpen, onClose, onAdd, initialData }: AddReco
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Judul Dokumen</label>
                     <input
                       required
+                      disabled
                       value={formData.title}
-                      onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
-                      placeholder="e.g. Laporan Keuangan Q1 2024"
-                      className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 font-medium"
+                      placeholder="Pilih kategori untuk mengisi judul"
+                      className="w-full bg-slate-100 dark:bg-slate-800/80 border-none rounded-2xl px-6 py-4 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 font-bold text-slate-500 cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-2">
@@ -119,14 +136,15 @@ export function AddRecordDialog({ isOpen, onClose, onAdd, initialData }: AddReco
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Kategori</label>
                     <select
-                      value={formData.category}
-                      onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}
+                      required
+                      value={formData.category_id}
+                      onChange={e => handleCategoryChange(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all font-medium appearance-none"
                     >
-                      <option value="General">General</option>
-                      <option value="Finance">Finance</option>
-                      <option value="HR">HR</option>
-                      <option value="Legal">Legal</option>
+                      <option value="" disabled>Pilih Jenis Laporan</option>
+                      {categories.map((c: ReportCategory) => (
+                        <option key={c.id} value={c.id}>{c.name} {c.sub_category ? `(${c.sub_category})` : ''}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="space-y-2">

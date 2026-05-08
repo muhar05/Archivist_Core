@@ -12,6 +12,7 @@ import { LockerView } from "@/components/dashboard/locations/LockerView"
 import { ArchitectCanvas, CanvasUnit } from "@/components/dashboard/locations/ArchitectCanvas"
 import { AddLoanDialog, LoanFormData } from "@/components/dashboard/loans/add-loan-dialog"
 import { ReportDetailDialog } from "@/components/dashboard/records/report-detail-dialog"
+import { useSession } from "next-auth/react"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
 import { type Report } from "@/services/reportService"
@@ -24,7 +25,7 @@ export default function LocationDetailPage() {
   const [isViewOpen, setIsViewOpen] = React.useState(false)
   const [selectedReportForLoan, setSelectedReportForLoan] = React.useState<{ id: string; title: string; code: string } | null>(null)
   const [selectedReportForView, setSelectedReportForView] = React.useState<(Report & { creator?: { full_name: string } }) | null>(null)
-  const { data: session } = useQuery({ queryKey: ["session"], queryFn: () => fetch("/api/auth/session").then(res => res.json()) })
+  const { data: session } = useSession()
   const unitId = id as string
 
   // Fetch Hierarchy for Breadcrumbs
@@ -70,7 +71,7 @@ export default function LocationDetailPage() {
     mutationFn: (loanData: LoanFormData) => {
       return createLoanAction({
         report_id: loanData.recordId,
-        borrower_id: loanData.borrowerId,
+        borrower_id: loanData.borrowerUuid,
         due_date: new Date(loanData.dueDate),
         notes: loanData.notes
       })
