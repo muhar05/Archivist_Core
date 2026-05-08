@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Archivist: Physical Records Management System (PRMS)
 
-## Getting Started
+**The Archivist** adalah sistem manajemen pengarsipan laporan fisik canggih yang dirancang untuk melacak lokasi dokumen secara presisi di dalam gudang (Gudang > Lantai > Unit > Sub-unit/Loker). Sistem ini mengintegrasikan koordinat digital dengan keberadaan fisik melalui mekanisme "Request & Verification".
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🚀 Fitur Utama
+
+### 1. Architect Engine (X, Y, Z Logic)
+- **Top View (X, Y)**: Navigasi berbasis grid untuk memetakan tata letak ruangan.
+- **Elevation View (Z-Axis)**: Manajemen tumpukan vertikal (misal: rak di dalam lemari).
+- **Multi-Level Support**: Mendukung pengelolaan lantai dalam satu gedung.
+- **Infinite Nesting**: Struktur unit rekursif (Ruangan -> Rak -> Lemari -> Loker).
+
+### 2. Workflow Manajemen Dokumen
+- **Deposit Flow**: Pengajuan penyimpanan oleh Staff -> Verifikasi fisik oleh Admin -> Status 'ARCHIVED'.
+- **Loan Flow**: Permintaan peminjaman -> Persetujuan Admin -> Pelacakan tanggal jatuh tempo dengan notifikasi visual.
+- **Bulk Relocation**: Fitur pemindahan seluruh isi unit ke lokasi lain dalam satu transaksi.
+
+### 3. Keamanan & Peran (RBAC)
+- **Admin**: Arsitek tata letak, verifikator dokumen, dan pengelola pengguna.
+- **Staff**: Operator yang melakukan input metadata, permintaan penyimpanan, dan peminjaman.
+- **RLS (Row Level Security)**: Keamanan data tingkat database menggunakan Supabase.
+
+### 4. Pencarian Canggih
+- **Semantic Search**: Menggunakan `pgvector` untuk mencari dokumen berdasarkan makna kata (bukan sekadar kata kunci) pada judul dan deskripsi.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
+- **Bahasa**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) dengan estetika **Nova Style** (Dark Mode default, Glassmorphism).
+- **Database**: [PostgreSQL](https://www.postgresql.org/) via [Supabase](https://supabase.com/)
+- **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+- **Authentikasi**: [NextAuth.js](https://next-auth.js.org/)
+- **State Management**: [TanStack Query v5](https://tanstack.com/query/latest)
+- **Animasi**: [Framer Motion](https://www.framer.com/motion/)
+
+---
+
+## 📂 Struktur Proyek
+
+```text
+app/
+├── (auth)/          # Login & Registrasi
+├── (dashboard)/     # Panel Utama (Admin & Staff)
+├── api/             # API Routes & Auth
+services/            # Logika Bisnis & Query Database
+db/                  # Schema & Migrasi Drizzle
+components/          # Komponen UI Reusable
+hooks/               # Custom React Hooks (TanStack Query)
+types/               # Definisi Type TypeScript
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ⚙️ Persiapan Lokal
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1.  **Clone repositori**:
+    ```bash
+    git clone https://github.com/muhar05/Archivist_Core.git
+    cd archivist-core
+    ```
 
-## Learn More
+2.  **Instal dependensi**:
+    ```bash
+    npm install
+    ```
 
-To learn more about Next.js, take a look at the following resources:
+3.  **Konfigurasi Environment**:
+    Buat file `.env.local` dan isi sesuai dengan kredensial Supabase dan NextAuth Anda:
+    ```env
+    DATABASE_URL=
+    NEXTAUTH_SECRET=
+    NEXTAUTH_URL=http://localhost:3000
+    NEXT_PUBLIC_SUPABASE_URL=
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=
+    ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4.  **Jalankan aplikasi**:
+    ```bash
+    npm run dev
+    ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🧪 Panduan Testing
+Untuk detail langkah-langkah pengujian per role, silakan merujuk pada file [TESTING_FLOW.md](./TESTING_FLOW.md).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📄 Lisensi
+Proyek ini dikembangkan untuk kebutuhan manajemen arsip fisik internal.
