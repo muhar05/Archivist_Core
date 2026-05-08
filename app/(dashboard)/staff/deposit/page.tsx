@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { Suspense } from "react"
 import { DepositForm } from "@/components/dashboard/staff/DepositForm"
 import { PlacementList } from "@/components/dashboard/staff/PlacementList"
 import { motion } from "framer-motion"
@@ -20,7 +20,9 @@ export default function DepositRequestPage() {
         </div>
       </div>
 
-      <PlacementList />
+      <Suspense fallback={<div className="h-48 w-full animate-pulse bg-white/5 rounded-2xl" />}>
+        <PlacementList />
+      </Suspense>
 
       <div className="h-px bg-white/5 w-full" />
 
@@ -34,7 +36,9 @@ export default function DepositRequestPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <DepositForm />
+          <Suspense fallback={<div className="h-96 w-full animate-pulse bg-white/5 rounded-2xl" />}>
+            <DepositForm />
+          </Suspense>
         </motion.div>
       </div>
     </div>
