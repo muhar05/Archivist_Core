@@ -1,10 +1,10 @@
+import * as dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+
 import { db } from "./index";
 import * as schema from "./schema";
 import { sql } from "drizzle-orm";
-import * as dotenv from "dotenv";
 import bcrypt from "bcryptjs";
-
-dotenv.config({ path: ".env.local" });
 
 async function main() {
   console.log("🌱 Seeding database...");
