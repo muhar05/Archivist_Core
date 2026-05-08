@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import { motion } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useSession } from "next-auth/react"
 import { getAllReportsAction, deleteReportAction, updateReportAction, createReportAction } from "@/actions/reportActions"
 import { RecordTable } from "@/components/dashboard/records/record-table"
 import { AddRecordDialog } from "@/components/dashboard/records/add-record-dialog"
@@ -20,10 +21,7 @@ export default function RecordsPage() {
   const [selectedRecord, setSelectedRecord] = useState<ArchivalRecord | null>(null);
   const [selectedReportForView, setSelectedReportForView] = useState<(Report & { creator?: { full_name: string } }) | null>(null);
 
-  const { data: session } = useQuery({ 
-    queryKey: ["session"], 
-    queryFn: () => fetch("/api/auth/session").then(res => res.json()) 
-  });
+  const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
 
   // Fetch real data from database
@@ -57,21 +55,37 @@ export default function RecordsPage() {
 
   const upsertMutation = useMutation({
     mutationFn: (data: { title: string; code: string; status: RecordStatus; description: string }) => {
+      const userId = session?.user?.id;
+      
+      const statusMap: Record<string, string> = {
+        'ACTIVE': 'archived',
+        'BORROWED': 'loaned',
+        'PENDING': 'pending',
+        'ARCHIVED': 'archived',
+      };
+      
+      const dbStatus = (statusMap[data.status] || 'pending') as "pending" | "pending_placement" | "archived" | "loaned" | "rejected";
+
       if (selectedRecord) {
         return updateReportAction(selectedRecord.id, {
           title: data.title,
           report_number: data.code,
-          status: data.status.toLowerCase() as "pending" | "pending_placement" | "archived" | "loaned" | "rejected",
+          status: dbStatus,
           description: data.description
         });
       }
+
+      if (!userId) {
+        throw new Error("Sesi pengguna tidak valid. Silakan login kembali.");
+      }
+
       return createReportAction({
         title: data.title,
         report_number: data.code,
-        status: data.status.toLowerCase() as "pending" | "pending_placement" | "archived" | "loaned" | "rejected",
+        status: dbStatus,
         description: data.description,
         client: "Internal",
-        created_by: "system" 
+        created_by: userId
       });
     },
     onSuccess: () => {
