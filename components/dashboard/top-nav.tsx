@@ -40,9 +40,6 @@ export function TopNav({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="flex items-center gap-3">
         <div className="hidden md:flex gap-1">
-          <Link href="/profile" className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer rounded-lg">
-            <span className="material-symbols-outlined">settings</span>
-          </Link>
           <button 
             onClick={() => signOut({ callbackUrl: '/' })}
             className="p-2 text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer rounded-lg"

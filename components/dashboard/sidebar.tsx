@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useSession, signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { motion, AnimatePresence } from "framer-motion"
 
 const navigation = [
@@ -98,13 +98,6 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             </div>
           </div>
           
-          <button
-            onClick={() => signOut({ callbackUrl: "/auth/login" })}
-            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-200 group"
-          >
-            <span className="material-symbols-outlined group-hover:rotate-12 transition-transform">logout</span>
-            <span className="font-bold">Logout</span>
-          </button>
         </div>
       </div>
     </div>
